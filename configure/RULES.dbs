@@ -1,0 +1,12 @@
+# Special rule for .dbs files!
+vpath %.dbs $(USR_VPATH) $(GENERIC_SRC_DIRS) $(COMMON_DIR)
+
+$(COMMON_DIR)/%.db$(RAW): %.dbs
+	@echo "Processing $<"
+	$(STEPSEQ)/macro/prep $< $@
+
+# Rule for creating foo.db.d from foo.dbs
+%.db$(RAW)$(DEP): %.dbs
+	@$(RM) $@
+	@echo "Creating dependency $@ from $<"
+	@echo $(COMMONDEP_TARGET): $< >> $@
