@@ -21,7 +21,7 @@ include $(TOP)/configure/CONFIG
 
 LIBRARY_IOC_Linux = stepseq
 
-DBD += stepSequenceRecord.dbd
+DBDINC += stepSequenceRecord.dbd
 INC += seq_funcs.h
 
 LIBSRCS += stepSequenceRecord.c

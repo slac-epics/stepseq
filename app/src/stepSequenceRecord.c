@@ -218,7 +218,6 @@ static long process(struct stepSequenceRecord *prec)
          * already reflect this!
          */
         int abort = (prec->state == selSSRstate_Aborted);
-        int skip = 0;
         char *pre = (&prec->pre0)[prec->val];
         char buf[128], *t = buf;
         if (prec->dlying)
@@ -232,7 +231,6 @@ static long process(struct stepSequenceRecord *prec)
                 if (st || !strcmp(buf, "DONE"))
                     t[0] = 0;
                 else if (!strncmp(buf, "ABORT: ", 7)) { /* Strip "ABORT: "! */
-                    skip = 1;
                     t += 7;
                     abort = 1;
                 }
