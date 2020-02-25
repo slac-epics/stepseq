@@ -1,0 +1,259 @@
+menu(selSSRstate) {
+    choice(selSSRstate_Done,    "Done")
+    choice(selSSRstate_Running, "Running")
+    choice(selSSRstate_Aborted, "Aborted")
+}
+
+recordtype(stepSequence) {
+    include "dbCommon.dbd"
+    field(VAL, DBF_LONG) {
+        prompt("Current Step")
+	asl(ASL0)
+        special(SPC_NOMOD)
+	initial(0)
+    }
+    field(STEPNAME, DBF_STRING) {
+        prompt("Current Step Name")
+	asl(ASL0)
+        special(SPC_NOMOD)
+	size(60)
+    }
+    field(WAIT, DBF_MENU) {
+        prompt("Waiting?")
+        special(SPC_NOMOD)
+	menu(menuYesNo)
+	initial(NO)
+    }
+    field(DLY, DBF_DOUBLE) {
+        prompt("Delay (seconds)")
+	initial(0.1)
+        pp(TRUE)
+    }
+    field(DLYING, DBF_MENU) {
+        prompt("Delaying?")
+        special(SPC_NOMOD)
+	menu(menuYesNo)
+	initial(NO)
+    }
+    field(REQ, DBF_LONG) {
+        prompt("Request Processing")
+        interest(1)
+        pp(TRUE)
+    }
+    field(ABRT, DBF_LONG) {
+        prompt("Abort Processing")
+        interest(1)
+        pp(TRUE)
+    }
+    field(CLR, DBF_INLINK) {
+        prompt("Clear Abort State")
+        interest(1)
+	special(SPC_NOMOD)
+    }
+    field(STATE, DBF_MENU) {
+        prompt("Current State")
+        interest(1)
+        special(SPC_NOMOD)
+	menu(selSSRstate)
+    }
+    field(REQ0, DBF_OUTLINK) {
+        interest(1)
+	special(SPC_NOMOD)
+    }
+    field(REQ1, DBF_OUTLINK) {
+        interest(1)
+	special(SPC_NOMOD)
+    }
+    field(REQ2, DBF_OUTLINK) {
+        interest(1)
+	special(SPC_NOMOD)
+    }
+    field(REQ3, DBF_OUTLINK) {
+        interest(1)
+	special(SPC_NOMOD)
+    }
+    field(REQ4, DBF_OUTLINK) {
+        interest(1)
+	special(SPC_NOMOD)
+    }
+    field(REQ5, DBF_OUTLINK) {
+        interest(1)
+	special(SPC_NOMOD)
+    }
+    field(REQ6, DBF_OUTLINK) {
+        interest(1)
+	special(SPC_NOMOD)
+    }
+    field(REQ7, DBF_OUTLINK) {
+        interest(1)
+	special(SPC_NOMOD)
+    }
+    field(REQ8, DBF_OUTLINK) {
+        interest(1)
+	special(SPC_NOMOD)
+    }
+    field(REQ9, DBF_OUTLINK) {
+        interest(1)
+	special(SPC_NOMOD)
+    }
+    field(ABRT0, DBF_OUTLINK) {
+        interest(1)
+	special(SPC_NOMOD)
+    }
+    field(ABRT1, DBF_OUTLINK) {
+        interest(1)
+	special(SPC_NOMOD)
+    }
+    field(ABRT2, DBF_OUTLINK) {
+        interest(1)
+	special(SPC_NOMOD)
+    }
+    field(ABRT3, DBF_OUTLINK) {
+        interest(1)
+	special(SPC_NOMOD)
+    }
+    field(ABRT4, DBF_OUTLINK) {
+        interest(1)
+	special(SPC_NOMOD)
+    }
+    field(ABRT5, DBF_OUTLINK) {
+        interest(1)
+	special(SPC_NOMOD)
+    }
+    field(ABRT6, DBF_OUTLINK) {
+        interest(1)
+	special(SPC_NOMOD)
+    }
+    field(ABRT7, DBF_OUTLINK) {
+        interest(1)
+	special(SPC_NOMOD)
+    }
+    field(ABRT8, DBF_OUTLINK) {
+        interest(1)
+	special(SPC_NOMOD)
+    }
+    field(ABRT9, DBF_OUTLINK) {
+        interest(1)
+	special(SPC_NOMOD)
+    }
+    field(STATE0, DBF_INLINK) {
+        interest(1)
+	special(SPC_NOMOD)
+    }
+    field(STATE1, DBF_INLINK) {
+        interest(1)
+	special(SPC_NOMOD)
+    }
+    field(STATE2, DBF_INLINK) {
+        interest(1)
+	special(SPC_NOMOD)
+    }
+    field(STATE3, DBF_INLINK) {
+        interest(1)
+	special(SPC_NOMOD)
+    }
+    field(STATE4, DBF_INLINK) {
+        interest(1)
+	special(SPC_NOMOD)
+    }
+    field(STATE5, DBF_INLINK) {
+        interest(1)
+	special(SPC_NOMOD)
+    }
+    field(STATE6, DBF_INLINK) {
+        interest(1)
+	special(SPC_NOMOD)
+    }
+    field(STATE7, DBF_INLINK) {
+        interest(1)
+	special(SPC_NOMOD)
+    }
+    field(STATE8, DBF_INLINK) {
+        interest(1)
+	special(SPC_NOMOD)
+    }
+    field(STATE9, DBF_INLINK) {
+        interest(1)
+	special(SPC_NOMOD)
+    }
+    field(STEPNAME0, DBF_INLINK) {
+        interest(1)
+	special(SPC_NOMOD)
+    }
+    field(STEPNAME1, DBF_INLINK) {
+        interest(1)
+	special(SPC_NOMOD)
+    }
+    field(STEPNAME2, DBF_INLINK) {
+        interest(1)
+	special(SPC_NOMOD)
+    }
+    field(STEPNAME3, DBF_INLINK) {
+        interest(1)
+	special(SPC_NOMOD)
+    }
+    field(STEPNAME4, DBF_INLINK) {
+        interest(1)
+	special(SPC_NOMOD)
+    }
+    field(STEPNAME5, DBF_INLINK) {
+        interest(1)
+	special(SPC_NOMOD)
+    }
+    field(STEPNAME6, DBF_INLINK) {
+        interest(1)
+	special(SPC_NOMOD)
+    }
+    field(STEPNAME7, DBF_INLINK) {
+        interest(1)
+	special(SPC_NOMOD)
+    }
+    field(STEPNAME8, DBF_INLINK) {
+        interest(1)
+	special(SPC_NOMOD)
+    }
+    field(STEPNAME9, DBF_INLINK) {
+        interest(1)
+	special(SPC_NOMOD)
+    }
+    field(PRE0, DBF_STRING) {
+	size(40)
+        interest(1)
+    }
+    field(PRE1, DBF_STRING) {
+	size(40)
+        interest(1)
+    }
+    field(PRE2, DBF_STRING) {
+	size(40)
+        interest(1)
+    }
+    field(PRE3, DBF_STRING) {
+	size(40)
+        interest(1)
+    }
+    field(PRE4, DBF_STRING) {
+	size(40)
+        interest(1)
+    }
+    field(PRE5, DBF_STRING) {
+	size(40)
+        interest(1)
+    }
+    field(PRE6, DBF_STRING) {
+	size(40)
+        interest(1)
+    }
+    field(PRE7, DBF_STRING) {
+	size(40)
+        interest(1)
+    }
+    field(PRE8, DBF_STRING) {
+	size(40)
+        interest(1)
+    }
+    field(PRE9, DBF_STRING) {
+	size(40)
+        interest(1)
+    }
+}
