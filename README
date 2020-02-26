@@ -1,0 +1,7 @@
+How to use the stepseq module:
+    - In the app/src/Makefile, include stepseq.dbd in your app_DBD and
+      stepseq in your app_LIBS.
+    - In configure/RULES, add the line:
+      	 include $(STEPSEQ)/configure/RULES.dbs
+    - In any script using python, put "${STEPSEQ}/python" on PYTHONPATH to
+      get access to sequtils.py.
