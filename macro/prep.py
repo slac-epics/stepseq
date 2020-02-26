@@ -196,19 +196,19 @@ def generate_seq(name, seq, fp):
                    ("DOL3", "1"),
                    ("LNK3", "%s:_TEST%d.PROC" % (name, i))])
             record("stringout", "%s:_SETNAME%d" % (name, i), "Testing Condition", fp,
-                   [("OUT", "%s:_STEPNAME%d" % (name, i))])
+                   [("OUT", "%s:_STEPNAME%d PP" % (name, i))])
             record("stringout", "%s:_MONNAME%d" % (name, i), None, fp,
                    [("OMSL", "closed_loop"),
                     ("DOL",  "%s:_SEQ%d.STEPNAME CPP" % (name, i)),
-                    ("OUT",  "%s:_STEPNAME%d" % (name, i))])
+                    ("OUT",  "%s:_STEPNAME%d PP" % (name, i))])
             record("calcout", "%s:_TEST%d" % (name, i), None, fp, [
                    ("INPA", "%s NPP" % l[1][1]),
                    ("CALC", "(A==1)?1:2"),
-                   ("OOPT", "Always"),
+                   ("OOPT", "Every Time"),
                    ("DOPT", "Use CALC"),
                    ("OUT",  "%s:_SELECT%d.SELN PP" % (name, i))
                    ])
-            record("seq", "%s_SELECT%d" % (name, i), None, fp, [
+            record("seq", "%s:_SELECT%d" % (name, i), None, fp, [
                    ("SELM", "Specified"),
                    ("DOL1", "1"),
                    ("LNK1",  "%s:_SEQ%d.REQ PP" % (name, i)),
@@ -226,12 +226,15 @@ def generate_seq(name, seq, fp):
             i = i + 1
             continue
         if l[0] == 'WAIT':
+            print l
             if len(l[1]) == 3:
                 t = l[1][2]
             else:
                 t = "-1"
             record("longout", "%s:_TIMEOUT%d" % (name, i), t, fp)
             record("longout", "%s:_COUNT%d" % (name, i), "0", fp)
+            record("longout", "%s:_ABRT%d" % (name, i), "2", fp,
+                   [("OUT",  "%s:_STATE%d PP" % (name, i))])
             record("longout", "%s:_STATE%d" % (name, i), "0", fp)
             record("calcout", "%s:_CALCC%d" % (name, i), None, fp,
                    [("INPA", "%s:_TIMEOUT%d NPP" % (name, i)),
@@ -242,14 +245,14 @@ def generate_seq(name, seq, fp):
                     ("DOPT", "Use OCAL"),
                     ("OOPT", "When Non-zero"),
                     ("OUT",  "%s:_COUNT%d PP" % (name, i)),
-                    ("OCAL", "(B!=0)?(B-1):0")])
+                    ("OCAL", "(B<-10||B==0)?(B?-1:0):(B-1)")])
             record("calcout", "%s:_CALCS%d" % (name, i), None, fp,
                    [("INPA", "%s:_STATE%d CPP" % (name, i)),
                     ("INPB", "%s:_COUNT%d CPP" % (name, i)),
                     ("INPC", "%s CPP" % l[1][1]),
                     ("CALC", "(A!=1)?A:(C?0:(B==0?2:1))"),
                     ("DOPT", "Use CALC"),
-                    ("OOPT", "Always"),
+                    ("OOPT", "Every Time"),
                     ("OUT",  "%s:_STATE%d PP" % (name, i))])
             record("seq", "%s:_START%d" % (name, i), None, fp, [
                    ("SELM", "All"),
@@ -257,7 +260,8 @@ def generate_seq(name, seq, fp):
                    ("LNK1", "%s:_STATE%d PP" % (name, i)),
                    ("DOL2", "%s:_TIMEOUT%d NPP" % (name, i)),
                    ("LNK2", "%s:_COUNT%d PP" % (name, i))])
-            out.append('    field(REQ%d,       "%s:_START%d.PROC PP")\n' % (i % 9, name, i))
+            out.append('    field(REQ%d,       "%s:_START%d.PROC")\n' % (i % 9, name, i))
+            out.append('    field(ABRT%d,      "%s:_ABRT%d.PROC")\n' % (i % 9, name, i))
             out.append('    field(STATE%d,     "%s:_STATE%d CPP")\n' % (i % 9, name, i))
             i = i + 1
             continue
