@@ -20,11 +20,15 @@ include $(TOP)/configure/CONFIG
 #=======================================================
 
 LIBRARY_IOC_Linux = stepseq
+DBD += stepseq.dbd
 
-DBDINC += stepSequenceRecord.dbd
+stepseq_DBD += seq_funcs.dbd
+stepseq_DBD += stepSequenceRecord.dbd
+
+DBDINC += stepSequenceRecord
 INC += seq_funcs.h
 
-LIBSRCS += stepSequenceRecord.c
+LIBSRCS += stepSequenceRecord.c seq_funcs.cpp
 
 include $(TOP)/configure/RULES
 #----------------------------------------
