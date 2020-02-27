@@ -219,7 +219,7 @@ static long process(struct stepSequenceRecord *prec)
          */
         int abort = (prec->state == selSSRstate_Aborted);
         char *pre = (&prec->pre0)[prec->val];
-        char buf[128], *t = buf;
+        char buf[128], *t = buf, *u;
         if (prec->dlying)
             strcpy(buf, "Next step");
         else {
@@ -255,6 +255,8 @@ static long process(struct stepSequenceRecord *prec)
                 strcpy(s, ": ");
                 s += 2;
             }
+            if ((u = index(t, ':'))) /* We've added a prefix, chop what follows! */
+                *u = 0;
         }
         if (t[0]) {
             strcpy(s, t);

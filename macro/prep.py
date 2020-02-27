@@ -192,7 +192,7 @@ def generate_seq(name, seq, fp):
                    ("DOL1", "1"),
                    ("LNK1", "%s:_STATE%d PP" % (name, i)),
                    ("DOL2", "1"),
-                   ("LNK2", "%s:_SETNAME%d PP" % (name, i)),
+                   ("LNK2", "%s:_SETNAME%d.PROC" % (name, i)),
                    ("DOL3", "1"),
                    ("LNK3", "%s:_TEST%d.PROC" % (name, i))])
             record("stringout", "%s:_SETNAME%d" % (name, i), "Testing Condition", fp,
@@ -220,13 +220,12 @@ def generate_seq(name, seq, fp):
             generate_seq("%s:_SEQ%d" % (name, i), l[2], fp);
                 
             out.append('    field(REQ%d,       "%s:_START%d.PROC")\n' % (i % 9, name, i))
-            out.append('    field(ABRT%d,      "%s:_SEQ.ABRT%d PP")\n' % (i % 9, name, i))
+            out.append('    field(ABRT%d,      "%s:_SEQ%d.ABRT PP")\n' % (i % 9, name, i))
             out.append('    field(STATE%d,     "%s:_STATE%d CPP")\n' % (i % 9, name, i))
             out.append('    field(STEPNAME%d,  "%s:_STEPNAME%d CPP")\n' % (i % 9, name, i))
             i = i + 1
             continue
         if l[0] == 'WAIT':
-            print l
             if len(l[1]) == 3:
                 t = l[1][2]
             else:
@@ -360,6 +359,7 @@ def generate_seq(name, seq, fp):
             continue
         if l[0] == 'EXTERN':
             record("longout", "%s:_PID%d" % (name, i), "-1", fp)
+            record("longout", "%s:_PIPE%d" % (name, i), "-1", fp)
             record("aSub", "%s:_START%d" % (name, i), None, fp,
                    [("SNAM", "ProcessInit"),
                     ("EFLG", "ALWAYS"),
@@ -398,6 +398,9 @@ def generate_seq(name, seq, fp):
                     ("INPD",  "%s:_STATE%d NPP" % (name, i)),
                     ("FTD",   "LONG"),
                     ("NOD",   "1"),
+                    ("INPE",  "%s:_PIPE%d NPP" % (name, i)),
+                    ("FTE",   "LONG"),
+                    ("NOE",   "1"),
                     ("OUTA",  "%s:_PID%d PP" % (name, i)),
                     ("FTVA",  "LONG"),
                     ("NOVA",  "1"),
@@ -409,7 +412,10 @@ def generate_seq(name, seq, fp):
                     ("NOVC",   "1"),
                     ("OUTD",  "%s:_STATE%d PP" % (name, i)),
                     ("FTVD",  "LONG"),
-                    ("NOVD",  "1")])
+                    ("NOVD",  "1"),
+                    ("OUTE",  "%s:_PIPE%d PP" % (name, i)),
+                    ("FTVE",  "LONG"),
+                    ("NOVE",  "1")])
             if len(l) != 3:
                 raise IOError("EXTERN must have a PROG field!")
             prog = ""
@@ -442,14 +448,17 @@ def generate_seq(name, seq, fp):
             fp.write('    field(INPC,  "%s:_PID%d NPP")\n' % (name, i))
             fp.write('    field(FTC,   "LONG")\n')
             fp.write('    field(NOC,   "1")\n')
-            fp.write('    field(INPD,  "%s:_ARGS%d NPP")\n' % (name, i))
+            fp.write('    field(INPD,  "%s:_PIPE%d NPP")\n' % (name, i))
             fp.write('    field(FTD,   "LONG")\n')
             fp.write('    field(NOD,   "1")\n')
-            fp.write('    field(INPE,  "%s:_STEPNAMENAME%d NPP")\n' % (name, i))
-            fp.write('    field(FTE,   "STRING")\n')
+            fp.write('    field(INPE,  "%s:_ARGS%d NPP")\n' % (name, i))
+            fp.write('    field(FTE,   "LONG")\n')
             fp.write('    field(NOE,   "1")\n')
+            fp.write('    field(INPF,  "%s:_STEPNAMENAME%d NPP")\n' % (name, i))
+            fp.write('    field(FTF,   "STRING")\n')
+            fp.write('    field(NOF,   "1")\n')
             for (n, lll) in enumerate(ll):
-                c = chr(ord('F') + n)
+                c = chr(ord('G') + n)
                 fp.write('    field(INP%s,  "%s:_PROG%d_%d NPP")\n' % 
                          (c, name, i, n))
                 fp.write('    field(FT%s,   "STRING")\n' %  c)
@@ -460,9 +469,12 @@ def generate_seq(name, seq, fp):
             fp.write('    field(OUTB,  "%s:_STATE%d PP")\n' % (name, i))
             fp.write('    field(FTVB,  "LONG")\n')
             fp.write('    field(NOVB,  "1")\n')
-            fp.write('    field(OUTC,  "%s:_PID%d PP")\n' % (name, i))
+            fp.write('    field(OUTC,  "%s:_PIPE%d PP")\n' % (name, i))
             fp.write('    field(FTVC,  "LONG")\n')
             fp.write('    field(NOVC,  "1")\n')
+            fp.write('    field(OUTD,  "%s:_PID%d PP")\n' % (name, i))
+            fp.write('    field(FTVD,  "LONG")\n')
+            fp.write('    field(NOVD,  "1")\n')
             fp.write('}\n\n')
             i = i + 1
             continue

@@ -71,16 +71,19 @@ long ProcessMonitor(struct aSubRecord *psub)
     epicsInt32 oabrt   = *(epicsInt32 *)psub->b;
     epicsInt8  *osn    = (epicsInt8 *)psub->c;
     epicsInt32 ostate  = *(epicsInt32 *)psub->d;
+    epicsInt32 opip    = *(epicsInt32 *)psub->e;
     epicsInt32 *pid    = (epicsInt32 *)psub->vala;
     epicsInt32 *abrt   = (epicsInt32 *)psub->valb;
     epicsInt8  *sn     = (epicsInt8 *)psub->valc;
     epicsInt32 *state  = (epicsInt32 *)psub->vald;
+    epicsInt32 *pip    = (epicsInt32 *)psub->vale;
 
     // Clear the abort, but just copy the rest of the state by default!
     *state = ostate;
     strcpy(sn, osn);
     *abrt = 0;
     *pid = opid;
+    *pip = opip;
 
     if (opid != -1) {
         siginfo_t info;
@@ -89,6 +92,8 @@ long ProcessMonitor(struct aSubRecord *psub)
         if (status) {
             printf("ProcessMonitor(%d): waitid returned status %d\n", opid, status);
             *state = selSSRstate_Aborted;
+            close(opip);
+            *pip = -1;
             *pid = -1;
             sprintf(sn, "ABORT: waitid error for pid %d", opid);
         } else if (info.si_pid != 0) {
@@ -100,10 +105,11 @@ long ProcessMonitor(struct aSubRecord *psub)
                 *state = selSSRstate_Done;
                 strcpy(sn, "DONE");
             }
+            close(opip);
+            *pip = -1;
             *pid = -1;
         }
         if (oabrt) {
-            printf("Abort requested, sending signal to %d\n", opid);
             int status = killpg(opid, SIGINT);
             if (status) {
                 printf("kill gives status %d?\n", status);
@@ -116,47 +122,98 @@ long ProcessMonitor(struct aSubRecord *psub)
     return 0;
 }
 
+static int grandchild = -1;
+static void monitor_handler(int signum)
+{
+    if (signum == SIGINT) {
+        killpg(grandchild, SIGINT);
+        return;
+    }
+    if (signum == SIGCHLD) {
+        siginfo_t info;
+        info.si_pid = 0;
+        int status = waitid(P_PID, grandchild, &info, WNOHANG | WEXITED);
+        if (status)
+            printf("PID %d: waitid status = %d?\n", getpid(), status);
+        _exit(info.si_status ? 1 : 0);
+    }
+}
+
 long ProcessSpawn(struct aSubRecord *psub)
 {
     epicsInt32 oreq    = *(epicsInt32 *)psub->a;
     epicsInt32 ostate  = *(epicsInt32 *)psub->b;
     epicsInt32 opid    = *(epicsInt32 *)psub->c;
-    epicsInt32 argc    = *(epicsInt32 *)psub->d;
-    epicsInt8 *stepnm  = (epicsInt8 *)psub->e;
-    epicsInt8 **av     = (epicsInt8 **)&psub->f;
+    epicsInt32 opip    = *(epicsInt32 *)psub->d;
+    epicsInt32 argc    = *(epicsInt32 *)psub->e;
+    epicsInt8 *stepnm  = (epicsInt8 *)psub->f;
+    epicsInt8 **av     = (epicsInt8 **)&psub->g;
     epicsInt32 *req    = (epicsInt32 *)psub->vala;
     epicsInt32 *state  = (epicsInt32 *)psub->valb;
-    epicsInt32 *pid    = (epicsInt32 *)psub->valc;
-    char      *argv[17]; // E-U!
+    epicsInt32 *pip    = (epicsInt32 *)psub->valc;
+    epicsInt32 *pid    = (epicsInt32 *)psub->vald;
+    char      *argv[15]; // G-U!
 
     // Clear the request, but just let everything else be unchanged.
     *req = 0;
     *state = ostate;
     *pid = opid;
+    *pip = opip;
 
-    memcpy(argv, av, 17*sizeof(char *));
+    memcpy(argv, av, 15*sizeof(char *));
     argv[argc] = NULL;
 
     if (oreq && opid == -1) {
+        int p[2] = {-1, -1};
+        pipe(p);
         if (!(*pid = fork())) {
             struct sched_param param;
             int status;
             sigset_t set;
-            char *buf = (char *)malloc(strlen(stepnm) + 12);
-            sprintf(buf, "STEPNAMEPV=%s", stepnm);
-            putenv(buf);
+            close(p[1]);
             sigemptyset(&set);
-            sigprocmask(SIG_SETMASK, &set, NULL);       /* Take all signals! */
-            setsid();                                   /* Be our own process group! */
+            sigprocmask(SIG_SETMASK, &set, NULL);    /* Take all signals! */
             param.sched_priority = 0;
             sched_setscheduler(0, SCHED_OTHER, &param); /* Not real-time! */
-            status = execvp(argv[0], argv);
-            printf("Exec of %s failed with status %d?\n", argv[0], status);
-            perror("ProcessSpawn");
-            exit(1);
+            if ((grandchild = fork())) {
+                setsid();                    /* Be our own process group! */
+                signal(SIGINT,  monitor_handler);
+                signal(SIGCHLD, monitor_handler);
+                /*
+                 * OK, we've made everyone their own process group... so if EPICS dies,
+                 * the child won't.  So, we need another generation... the *grandchild*
+                 * is the actual work, and this child just checks if the parent dies 
+                 * (the pipe closes), the child does (we get a SIGCHLD), or the parent
+                 * requests an abort (we get a SIGINT).
+                 *
+                 * However, EPICS has scheduled stuff for exit, so we have to exit with 
+                 * _exit!
+                 */
+                for (;;) {
+                    int ret, buf;
+                    ret = read(p[0], &buf, sizeof(int));
+                    if (!ret) {  /* EOF, our parent has died!! */
+                        killpg(grandchild, SIGINT);
+                        for (;;) /* Wait for the child to die. */
+                            sleep(10);
+                    }
+                }
+            } else {
+                char *buf;
+                buf = (char *)malloc(strlen(stepnm) + 12);
+                sprintf(buf, "STEPNAMEPV=%s", stepnm);
+                putenv(buf);
+                setsid();                  /* Be our own process group! */
+                status = execvp(argv[0], argv);
+                printf("Exec of %s failed with status %d?\n", argv[0], status);
+                perror("ProcessSpawn");
+                exit(1);
+            }
+        } else {
+            close(p[0]);
+            *pip = p[1];
+            *state = selSSRstate_Running;
         }
-        printf("Spawned process %d\n", *pid);
-        *state = selSSRstate_Running;
     }
     psub->udf = false;
     recGblGetTimeStamp(psub);
