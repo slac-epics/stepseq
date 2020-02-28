@@ -203,7 +203,7 @@ def generate_seq(name, seq, fp):
                     ("OUT",  "%s:_STEPNAME%d PP" % (name, i))])
             record("calcout", "%s:_TEST%d" % (name, i), None, fp, [
                    ("INPA", "%s NPP" % l[1][1]),
-                   ("CALC", "(A==1)?1:2"),
+                   ("CALC", "A?1:2"),
                    ("OOPT", "Every Time"),
                    ("DOPT", "Use CALC"),
                    ("OUT",  "%s:_SELECT%d.SELN PP" % (name, i))
@@ -264,11 +264,27 @@ def generate_seq(name, seq, fp):
             out.append('    field(STATE%d,     "%s:_STATE%d CPP")\n' % (i % 9, name, i))
             i = i + 1
             continue
+        if l[0] == 'ASSIGN_CALC':
+            ll = []
+            for x in l[2]:
+                if x[0] == 'field':
+                    ll.append((x[1][0], x[1][1]))
+                else:
+                    raise IoError("ASSIGN_CALC can only contain fields!")
+            #ll.append(("FLNK", "%s:_VALUE%d"))
+            record("calc", "%s:_CALC%d" % (name, i), None, fp, ll)
+            record("ao", "%s:_VALUE%d" % (name, i), None, fp, [
+                   ("OMSL", "closed_loop"),
+                   ("DOL",  "%s:_CALC%d PP" % (name, i)),
+                   ("OUT",  "%s PP" % l[1][1])])
+            out.append('    field(REQ%d,       "%s:_VALUE%d.PROC")\n' % (i % 9, name, i))
+            i = i + 1
+            continue
         if l[0][:4] == 'SET_':
             record(tdict[l[0][4:]], "%s:_VALUE%d" % (name, i), l[1][2], fp, [
                    ("OMSL", "supervisory"),
                    ("OUT",  "%s PP" % l[1][1])])
-            out.append('    field(REQ%d,       "%s:_VALUE%d.PROC PP")\n' % (i % 9, name, i))
+            out.append('    field(REQ%d,       "%s:_VALUE%d.PROC")\n' % (i % 9, name, i))
             i = i + 1
             continue;
         if l[0][:7] == 'ASSIGN_':
@@ -276,7 +292,7 @@ def generate_seq(name, seq, fp):
                    ("OMSL", "closed_loop"),
                    ("DOL",  "%s NPP" % l[1][2]),
                    ("OUT",  "%s PP" % l[1][1])])
-            out.append('    field(REQ%d,       "%s:_VALUE%d.PROC PP")\n' % (i % 9, name, i))
+            out.append('    field(REQ%d,       "%s:_VALUE%d.PROC")\n' % (i % 9, name, i))
             i = i + 1
             continue;
         if l[0] == 'EXTERN':
@@ -375,7 +391,7 @@ def generate_seq(name, seq, fp):
                     ("OUTB", "%s:_STEPNAME%d PP" % (name, i)),
                     ("FTVB", "STRING"),
                     ("NOVB", "1"),
-                    ("OUTC", "%s:_STEP%d.PROC PP" % (name, i)),
+                    ("OUTC", "%s:_STEP%d.PROC" % (name, i)),
                     ("FTVC", "LONG"),
                     ("NOVC", "1")])
             record("stringout", "%s:_STEPNAMENAME%d" % (name, i), 
