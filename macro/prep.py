@@ -104,6 +104,7 @@ def generate_seq(name, seq, fp):
             out.append('    field(STATE9,     "%s_%d.STATE CPP")\n'    % (name, sn))
             out.append('    field(STEPNAME9,  "%s_%d.STEPNAME CPP")\n' % (name, sn))
             out.append('    field(PRE9,       "")\n')
+            out.append('}\n')
             out.append('\n')
             out.append('record(stepSequence, %s_%d) {\n' % (name, sn))
             for x in f:
