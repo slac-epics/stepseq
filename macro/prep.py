@@ -37,6 +37,8 @@ def process(lines):
                 else:
                     args.append(x)
             c = [name, args]
+        if l[:6] == "FINISH":
+            c = ['FINISH']
         if ob is not None:
             start = i
             cnt = 1
@@ -115,7 +117,8 @@ def generate_seq(name, seq, fp):
         else:
             d = l[1][0]
             r = l[1][1]
-            out.append('    field(PRE%d,       "%s")\n' % (i % 9, d))
+            if l[0] != 'FINISH':
+                out.append('    field(PRE%d,       "%s")\n' % (i % 9, d))
         if l[0] == 'EPICS':
             out.append('    field(REQ%d,       "%s")\n' % (i % 9, r))
             if len(l) == 3:
@@ -176,6 +179,17 @@ def generate_seq(name, seq, fp):
             out.append('    field(REQ%d,       "%s:_DELAY%d.PROC PP")\n' % (i % 9, name, i))
             out.append('    field(STATE%d,     "%s:_STATE%d CPP")\n' % (i % 9, name, i))
             i = i + 1
+            continue
+        if l[0] == 'FINISH':
+            record("calcout", "%s:_FINISH" % (name), None, fp, [
+                   ("INPA", "%s.STATE CPP NMS" % (name)),
+                   ("CALC", "A==1"),
+                   ("OOPT", "Transition To Zero"),
+                   ("DOPT", "Use OCAL"),
+                   ("OCAL", "1"),
+                   ("OUT",  "%s:_FINISH_SEQ.REQ PP" % (name))
+                   ])
+            generate_seq("%s:_FINISH_SEQ" % (name), l[1], fp);
             continue
         if l[0] == 'IF' or l[0] == 'WHILE':
             record("longout", "%s:_STATE%d" % (name, i), "0", fp)
@@ -509,7 +523,7 @@ def expand(lines, fp):
         start = i
         while lines[i][0] != '}':
             i = i + 1
-        # print "\nSequence from line %d to line %d" % (start, i)
+        #print "\nSequence from line %d to line %d" % (start, i)
         d = process(lines[start:i+1])
         generate_seq(d[0][1][0], d[0][2], fp)
         i = i + 1

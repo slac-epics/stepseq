@@ -1,3 +1,4 @@
+#define USE_TYPED_RSET
 #include<registryFunction.h>
 #include<epicsExport.h>
 #include<dbCommon.h>
