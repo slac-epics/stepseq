@@ -181,19 +181,19 @@ def generate_seq(name, seq, fp):
             i = i + 1
             continue
         if l[0] == 'FINISH':
-            record("calcout", "%s:_FINISH" % (name), None, fp, [
+            record("calcout", "%s:_FIN" % (name), None, fp, [
                    ("INPA", "%s.STATE CPP NMS" % (name)),
                    ("CALC", "A==1"),
                    ("OOPT", "Transition To Zero"),
                    ("DOPT", "Use OCAL"),
                    ("OCAL", "1"),
-                   ("OUT",  "%s:_FINISH_SEQ.REQ PP" % (name))
+                   ("OUT",  "%s:_FIN_SEQ.REQ PP" % (name))
                    ])
-            generate_seq("%s:_FINISH_SEQ" % (name), l[1], fp);
+            generate_seq("%s:_FIN_SEQ" % (name), l[1], fp);
             continue
         if l[0] == 'IF' or l[0] == 'WHILE':
             record("longout", "%s:_STATE%d" % (name, i), "0", fp)
-            record("calcout", "%s:_MONSTATE%d" % (name, i), None, fp, [
+            record("calcout", "%s:_MONST%d" % (name, i), None, fp, [
                    ("INPA", "%s:_SEQ%d.STATE CPP" % (name, i)),
                    ("CALC", "A==0||A==2" if l[0] == 'IF' else "A==2"),
                    ("OOPT", "When Non-zero"),
@@ -201,7 +201,7 @@ def generate_seq(name, seq, fp):
                    ("OCAL", "A"),
                    ("OUT",  "%s:_STATE%d PP" % (name, i))
                    ])
-            record("stringout", "%s:_STEPNAME%d" % (name, i), "DONE", fp)
+            record("stringout", "%s:_SNAME%d" % (name, i), "DONE", fp)
             record("seq", "%s:_START%d" % (name, i), None, fp, [
                    ("SELM", "All"),
                    ("DOL1", "1"),
@@ -211,11 +211,11 @@ def generate_seq(name, seq, fp):
                    ("DOL3", "1"),
                    ("LNK3", "%s:_TEST%d.PROC" % (name, i))])
             record("stringout", "%s:_SETNAME%d" % (name, i), "Testing Condition", fp,
-                   [("OUT", "%s:_STEPNAME%d PP" % (name, i))])
+                   [("OUT", "%s:_SNAME%d PP" % (name, i))])
             record("stringout", "%s:_MONNAME%d" % (name, i), None, fp,
                    [("OMSL", "closed_loop"),
                     ("DOL",  "%s:_SEQ%d.STEPNAME CPP" % (name, i)),
-                    ("OUT",  "%s:_STEPNAME%d PP" % (name, i))])
+                    ("OUT",  "%s:_SNAME%d PP" % (name, i))])
             record("calcout", "%s:_TEST%d" % (name, i), None, fp, [
                    ("INPA", "%s NPP" % l[1][1]),
                    ("CALC", "A?1:2"),
@@ -237,7 +237,7 @@ def generate_seq(name, seq, fp):
             out.append('    field(REQ%d,       "%s:_START%d.PROC")\n' % (i % 9, name, i))
             out.append('    field(ABRT%d,      "%s:_SEQ%d.ABRT PP")\n' % (i % 9, name, i))
             out.append('    field(STATE%d,     "%s:_STATE%d CPP")\n' % (i % 9, name, i))
-            out.append('    field(STEPNAME%d,  "%s:_STEPNAME%d CPP")\n' % (i % 9, name, i))
+            out.append('    field(STEPNAME%d,  "%s:_SNAME%d CPP")\n' % (i % 9, name, i))
             i = i + 1
             continue
         if l[0] == 'WAIT':
@@ -286,28 +286,28 @@ def generate_seq(name, seq, fp):
                     ll.append((x[1][0], x[1][1]))
                 else:
                     raise IoError("ASSIGN_CALC can only contain fields!")
-            #ll.append(("FLNK", "%s:_VALUE%d"))
+            #ll.append(("FLNK", "%s:_VAL%d"))
             record("calc", "%s:_CALC%d" % (name, i), None, fp, ll)
-            record("ao", "%s:_VALUE%d" % (name, i), None, fp, [
+            record("ao", "%s:_VAL%d" % (name, i), None, fp, [
                    ("OMSL", "closed_loop"),
                    ("DOL",  "%s:_CALC%d PP" % (name, i)),
                    ("OUT",  "%s PP" % l[1][1])])
-            out.append('    field(REQ%d,       "%s:_VALUE%d.PROC")\n' % (i % 9, name, i))
+            out.append('    field(REQ%d,       "%s:_VAL%d.PROC")\n' % (i % 9, name, i))
             i = i + 1
             continue
         if l[0][:4] == 'SET_':
-            record(tdict[l[0][4:]], "%s:_VALUE%d" % (name, i), l[1][2], fp, [
+            record(tdict[l[0][4:]], "%s:_VAL%d" % (name, i), l[1][2], fp, [
                    ("OMSL", "supervisory"),
                    ("OUT",  "%s PP" % l[1][1])])
-            out.append('    field(REQ%d,       "%s:_VALUE%d.PROC")\n' % (i % 9, name, i))
+            out.append('    field(REQ%d,       "%s:_VAL%d.PROC")\n' % (i % 9, name, i))
             i = i + 1
             continue;
         if l[0][:7] == 'ASSIGN_':
-            record(tdict[l[0][7:]], "%s:_VALUE%d" % (name, i), None, fp, [
+            record(tdict[l[0][7:]], "%s:_VAL%d" % (name, i), None, fp, [
                    ("OMSL", "closed_loop"),
                    ("DOL",  "%s NPP" % l[1][2]),
                    ("OUT",  "%s PP" % l[1][1])])
-            out.append('    field(REQ%d,       "%s:_VALUE%d.PROC")\n' % (i % 9, name, i))
+            out.append('    field(REQ%d,       "%s:_VAL%d.PROC")\n' % (i % 9, name, i))
             i = i + 1
             continue;
         if l[0] == 'EXTERN':
@@ -316,11 +316,11 @@ def generate_seq(name, seq, fp):
         out.append('    field(REQ%d,       "%s:_REQ%d PP")\n' % (i % 9, name, i))
         out.append('    field(ABRT%d,      "%s:_ABRT%d PP")\n' % (i % 9, name, i))
         out.append('    field(STATE%d,     "%s:_STATE%d CPP")\n' % (i % 9, name, i))
-        out.append('    field(STEPNAME%d,  "%s:_STEPNAME%d CPP")\n' % (i % 9, name, i))
+        out.append('    field(STEPNAME%d,  "%s:_SNAME%d CPP")\n' % (i % 9, name, i))
         record("longout", "%s:_REQ%d" % (name, i), "0", fp)
         record("longout", "%s:_ABRT%d" % (name, i), "0", fp)
         record("longout", "%s:_STATE%d" % (name, i), "0", fp)
-        record("stringout", "%s:_STEPNAME%d" % (name, i), "DONE", fp)
+        record("stringout", "%s:_SNAME%d" % (name, i), "DONE", fp)
         if l[0] == 'ASUB':
             record("longout", "%s:_ACTIVE%d" % (name, i), "0", fp)
             fp.write('record(aSub, "%s:_STEP%d") {\n' % (name, i))
@@ -377,7 +377,7 @@ def generate_seq(name, seq, fp):
                                                           ll[1][1]))
                         if ll[1][0] == 'SCAN':
                             have_scan = True
-            fp.write('    field(OUTT,  "%s:_STEPNAME%d PP")\n' % (name, i))
+            fp.write('    field(OUTT,  "%s:_SNAME%d PP")\n' % (name, i))
             fp.write('    field(FTVT,  "STRING")\n')
             fp.write('    field(NOVT,  "1")\n')
             fp.write('    field(OUTU,  "%s:_STATE%d PP")\n' % (name, i))
@@ -403,14 +403,14 @@ def generate_seq(name, seq, fp):
                     ("OUTA", "%s:_STATE%d PP" % (name, i)),
                     ("FTVA", "LONG"),
                     ("NOVA", "1"),
-                    ("OUTB", "%s:_STEPNAME%d PP" % (name, i)),
+                    ("OUTB", "%s:_SNAME%d PP" % (name, i)),
                     ("FTVB", "STRING"),
                     ("NOVB", "1"),
                     ("OUTC", "%s:_STEP%d.PROC" % (name, i)),
                     ("FTVC", "LONG"),
                     ("NOVC", "1")])
-            record("stringout", "%s:_STEPNAMENAME%d" % (name, i), 
-                   "%s:_STEPNAME%d" % (name, i), fp)
+            record("stringout", "%s:_SNAMENAME%d" % (name, i), 
+                   "%s:_SNAME%d" % (name, i), fp)
             record("aSub", "%s:_PIDMON%d" % (name, i), None, fp,
                    [("SNAM",  "ProcessMonitor"),
                     ("EFLG",  "ON CHANGE"),
@@ -423,7 +423,7 @@ def generate_seq(name, seq, fp):
                     ("INPB",  "%s:_ABRT%d NPP" % (name, i)),
                     ("FTB",   "LONG"),
                     ("NOB",   "1"),
-                    ("INPC",  "%s:_STEPNAME%d NPP" % (name, i)),
+                    ("INPC",  "%s:_SNAME%d NPP" % (name, i)),
                     ("FTC",   "STRING"),
                     ("NOC",   "1"),
                     ("INPD",  "%s:_STATE%d NPP" % (name, i)),
@@ -438,7 +438,7 @@ def generate_seq(name, seq, fp):
                     ("OUTB",  "%s:_ABRT%d PP" % (name, i)),
                     ("FTVB",   "LONG"),
                     ("NOVB",   "1"),
-                    ("OUTC",  "%s:_STEPNAME%d PP" % (name, i)),
+                    ("OUTC",  "%s:_SNAME%d PP" % (name, i)),
                     ("FTVC",   "STRING"),
                     ("NOVC",   "1"),
                     ("OUTD",  "%s:_STATE%d PP" % (name, i)),
@@ -485,7 +485,7 @@ def generate_seq(name, seq, fp):
             fp.write('    field(INPE,  "%s:_ARGS%d NPP")\n' % (name, i))
             fp.write('    field(FTE,   "LONG")\n')
             fp.write('    field(NOE,   "1")\n')
-            fp.write('    field(INPF,  "%s:_STEPNAMENAME%d NPP")\n' % (name, i))
+            fp.write('    field(INPF,  "%s:_SNAMENAME%d NPP")\n' % (name, i))
             fp.write('    field(FTF,   "STRING")\n')
             fp.write('    field(NOF,   "1")\n')
             for (n, lll) in enumerate(ll):
