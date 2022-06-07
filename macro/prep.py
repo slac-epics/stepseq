@@ -80,7 +80,60 @@ def record(type, name, initial, fp, fields=[], auto=None):
         fp.write('    info(autosaveFields, "%s")\n' % auto)
     fp.write('}\n\n')
 
-tdict = {"INT": "longout", "FLOAT": "ao", "STR": "stringout"}
+def is_int(s):
+    try:
+        x = int(s)
+        return True
+    except:
+        return False
+
+def is_float(s):
+    try:
+        x = float(s)
+        return True
+    except:
+        return False
+
+#
+# Strings are harder.  Let's say if it contains a space,
+# it's a string, and if it doesn't contain more than one
+# colon, it's a string.  But we'll only warn here...
+#
+def is_str(s):
+    try:
+        x = s.index(' ')
+        return True
+    except:
+        pass
+    try:
+        x = s.index(':', s.index(':'))
+        return False
+    except:
+        return True
+
+tdict = {"INT":   ("longout",   is_int,   False), 
+         "FLOAT": ("ao",        is_float, False), 
+         "STR":   ("stringout", is_str,   False)}
+
+# The New regime: IF and WHILE can either have just a PVname as before,
+# or a "PVname op constant" expression.  op can be ==, =, #, !=, >, <, >=,
+# or <=.  There can be spaces.
+#
+# Given the string, return a two element list: the PVname, and the expression
+# string ("" if there isn't one.)
+def parse_expr(expr):
+    first = 1000
+    for c in ' =!<>#':
+        try:
+            f = expr.index(c)
+            if f < first:
+                first = f
+        except:
+            pass
+    if first == 1000:
+        return [expr, ""]
+    else:
+        return [expr[:first].strip(), expr[first:].strip()]
 
 def generate_seq(name, seq, fp):
     global tdict
@@ -163,9 +216,14 @@ def generate_seq(name, seq, fp):
             i = i + 1
             continue
         if l[0] == 'ABORT':
-            record("longout", "%s:_STATE%d" % (name, i), "2", fp)
+            record("seq", "%s:_SEQ%d" % (name, i), None, fp, [
+                   ("SELM", "All"),
+                   ("DOL1", "2"), ("LNK1", "%s:_STATE%d PP" % (name, i)),
+                   ("DLY2", 1), 
+                   ("DOL2", "1"), ("LNK2", "%s:_STATE%d PP" % (name, i))])
+            record("longout", "%s:_STATE%d" % (name, i), "1", fp)
             out.append('    field(PRE%d,       "%s")\n' % (i % 9, r))
-            out.append('    field(REQ%d,       "%s:_STATE%d.PROC PP")\n' % (i % 9, name, i))
+            out.append('    field(REQ%d,       "%s:_SEQ%d.PROC PP")\n' % (i % 9, name, i))
             out.append('    field(STATE%d,     "%s:_STATE%d CPP")\n' % (i % 9, name, i))
             
             i = i + 1
@@ -216,9 +274,10 @@ def generate_seq(name, seq, fp):
                    [("OMSL", "closed_loop"),
                     ("DOL",  "%s:_SEQ%d.STEPNAME CPP" % (name, i)),
                     ("OUT",  "%s:_SNAME%d PP" % (name, i))])
+            name_expr = parse_expr(l[1][1])
             record("calcout", "%s:_TEST%d" % (name, i), None, fp, [
-                   ("INPA", "%s NPP" % l[1][1]),
-                   ("CALC", "A?1:2"),
+                   ("INPA", "%s NPP" % name_expr[0]),
+                   ("CALC", "(A%s)?1:2" % name_expr[1]),
                    ("OOPT", "Every Time"),
                    ("DOPT", "Use CALC"),
                    ("OUT",  "%s:_SELECT%d.SELN PP" % (name, i))
@@ -260,11 +319,12 @@ def generate_seq(name, seq, fp):
                     ("OOPT", "When Non-zero"),
                     ("OUT",  "%s:_COUNT%d PP" % (name, i)),
                     ("OCAL", "(B<-10||B==0)?(B?-1:0):(B-1)")])
+            name_expr = parse_expr(l[1][1])
             record("calcout", "%s:_CALCS%d" % (name, i), None, fp,
                    [("INPA", "%s:_STATE%d CPP" % (name, i)),
                     ("INPB", "%s:_COUNT%d CPP" % (name, i)),
-                    ("INPC", "%s CPP" % l[1][1]),
-                    ("CALC", "(A!=1)?A:(C?0:(B==0?2:1))"),
+                    ("INPC", "%s CPP" % name_expr[0]),
+                    ("CALC", "(A!=1)?A:((C%s)?0:(B==0?2:1))" % name_expr[1]),
                     ("DOPT", "Use CALC"),
                     ("OOPT", "Every Time"),
                     ("OUT",  "%s:_STATE%d PP" % (name, i))])
@@ -292,18 +352,34 @@ def generate_seq(name, seq, fp):
                    ("OMSL", "closed_loop"),
                    ("DOL",  "%s:_CALC%d PP" % (name, i)),
                    ("OUT",  "%s PP" % l[1][1])])
+            if len(l[1]) > 2:
+                if l[1][2] == 'bo':
+                    record(l[1][2], l[1][1], None, fp, 
+                           [('ZNAM', 'False'), ('ONAM', 'True')])
+                else:
+                    record(l[1][2], l[1][1], None, fp)
             out.append('    field(REQ%d,       "%s:_VAL%d.PROC")\n' % (i % 9, name, i))
             i = i + 1
             continue
         if l[0][:4] == 'SET_':
-            record(tdict[l[0][4:]], "%s:_VAL%d" % (name, i), l[1][2], fp, [
+            td = tdict[l[0][4:]]
+            if not td[1](l[1][2]):
+                print "WARNING: %s for %s: %s does not look like it has type %s!" % (l[0], l[1][1], l[1][2], l[0][4:])
+                if td[2]:
+                    sys.exit(1)
+            record(td[0], "%s:_VAL%d" % (name, i), l[1][2], fp, [
                    ("OMSL", "supervisory"),
                    ("OUT",  "%s PP" % l[1][1])])
             out.append('    field(REQ%d,       "%s:_VAL%d.PROC")\n' % (i % 9, name, i))
             i = i + 1
             continue;
         if l[0][:7] == 'ASSIGN_':
-            record(tdict[l[0][7:]], "%s:_VAL%d" % (name, i), None, fp, [
+            td = tdict[l[0][7:]]
+            if td[1](l[1][2]):
+                print "WARNING: %s for %s: %s does not look like a PV!" % (l[0], l[1][1], l[1][2])
+                if td[2]:
+                    sys.exit(1)
+            record(td[0], "%s:_VAL%d" % (name, i), None, fp, [
                    ("OMSL", "closed_loop"),
                    ("DOL",  "%s NPP" % l[1][2]),
                    ("OUT",  "%s PP" % l[1][1])])
