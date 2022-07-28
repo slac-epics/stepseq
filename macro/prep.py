@@ -2,7 +2,7 @@
 import sys
 import re
 
-def process(lines):
+def process(lines, start):
     o = []
     i = 0;
     while i < len(lines):
@@ -22,7 +22,7 @@ def process(lines):
             ob = None
         c = []
         if l[0] == '#':
-            o.append(["COMMENT", l])
+            o.append([start+i, "COMMENT", l])
             continue
         if lp is not None and rp is not None:
             name = l[:lp].strip()
@@ -33,14 +33,16 @@ def process(lines):
                     if x[-1] == '"':
                         args.append(x[1:-1])
                     else:
-                        raise IOError("Argument %s is missing a double quote" % x)
+                        raise IOError("Line %d: Argument %s is missing a double quote" % (start+i, x))
                 else:
                     args.append(x)
-            c = [name, args]
+            c = [start+i, name, args]
         if l[:6] == "FINISH":
-            c = ['FINISH']
+            c = [start+i, 'FINISH']
+        if l[:4] == "ELSE":
+            c = [start+i, 'ELSE']
         if ob is not None:
-            start = i
+            st = i
             cnt = 1
             while i < len(lines):
                 if '{' in lines[i]:
@@ -51,9 +53,9 @@ def process(lines):
                     break
                 i = i + 1
             if i == len(lines):
-                raise IOError("Mismatched {}!")
+                raise IOError("Line %d: Mismatched {}!" % (start+st))
             i = i + 1
-            c.append(process(lines[start:i]))
+            c.append(process(lines[st:i], start+st))
         if c != []:
             o.append(c)
     return o
@@ -142,14 +144,20 @@ def generate_seq(name, seq, fp):
     f = []
     out = []
     out.append("record(stepSequence, %s) {\n" % name)
-    for l in seq:
-        if l[0] == "COMMENT":
-            out.append("    %s\n" % l[1])
+    for (idx,l) in enumerate(seq):
+        if l[1] == 'ELSE':
+            # This is totally done by the previous IF.  We should check
+            # there *is* a previous IF though!
+            if idx == 0 or seq[idx-1][1] != 'IF':
+                raise IOError("Line %d: Syntax error: ELSE with no previous IF!" % l[0])
+            continue  
+        if l[1] == "COMMENT":
+            out.append("    %s\n" % l[2])
             continue
-        if l[0] == "field":
-            x = '    field(%s"%s")\n' % (do_pad(l[1][0] + ","), l[1][1])
+        if l[1] == "field":
+            x = '    field(%s"%s")\n' % (do_pad(l[2][0] + ","), l[2][1])
             out.append(x)
-            if l[1][0] not in ["FLNK"]:
+            if l[2][0] not in ["FLNK"]:
                 f.append(x)
             continue
         if i != 0 and i % 9 == 0:
@@ -164,28 +172,28 @@ def generate_seq(name, seq, fp):
             out.append('record(stepSequence, %s_%d) {\n' % (name, sn))
             for x in f:
                 out.append(f)
-        if len(l[1]) == 1:
+        if len(l[2]) == 1:
             d = None
-            r = l[1][0]
+            r = l[2][0]
         else:
-            d = l[1][0]
-            r = l[1][1]
-            if l[0] != 'FINISH':
+            d = l[2][0]
+            r = l[2][1]
+            if l[1] not in ['FINISH', 'IF', 'WHILE']:
                 out.append('    field(PRE%d,       "%s")\n' % (i % 9, d))
-        if l[0] == 'EPICS':
+        if l[1] == 'EPICS':
             out.append('    field(REQ%d,       "%s")\n' % (i % 9, r))
-            if len(l) == 3:
-                for ll in l[2]:
-                    if ll[0] not in ['field', 'COMMENT']:
-                        raise IOError("Syntax error: field expected!")
-                    if ll[0] == "COMMENT":
-                        out.append("    %s\n" % ll[1])
+            if len(l) == 4:
+                for ll in l[3]:
+                    if ll[1] not in ['field', 'COMMENT']:
+                        raise IOError("Line %d: Syntax error: field expected!" % ll[0])
+                    if ll[1] == "COMMENT":
+                        out.append("    %s\n" % ll[2])
                     else:
-                        out.append('    field(%s"%s")\n' % (do_pad("%s%d," % (ll[1][0], i % 9)),
-                                                            ll[1][1]))
+                        out.append('    field(%s"%s")\n' % (do_pad("%s%d," % (ll[2][0], i % 9)),
+                                                            ll[2][1]))
             i = i + 1
             continue
-        if l[0] == 'SUBSEQ':
+        if l[1] == 'SUBSEQ':
             if d is not None and d.strip()[-1] == ':':
                 out.append('    field(STEPNAME%d,  "%s.STEPNAME CPP")\n' % (i % 9, r))
             out.append('    field(REQ%d,       "%s.REQ PP")\n' % (i % 9, r))
@@ -193,270 +201,291 @@ def generate_seq(name, seq, fp):
             out.append('    field(STATE%d,     "%s.STATE CPP")\n' % (i % 9, r))
             i = i + 1
             continue
-        if l[0] == 'PROMPT':
+        if l[1] == 'PROMPT':
             recordND("bo", r, "0", fp, [("ZNAM", "Off"), ("ONAM", "On")])
-            if len(l[1]) == 3:
-                dv = l[1][2]
+            if len(l[2]) == 3:
+                dv = l[2][2]
             else:
                 dv = "0"
-            recordND("bo", r + "_WAIT", "0", fp,
+            recordND("bo", r + "WT", "0", fp,
                    [("ZNAM", "Off"), ("ONAM", "On")])
-            recordND("bo", r + "_STARTWAIT", "1", fp,
+            recordND("bo", r + "SW", "1", fp,
                    [("ZNAM", "Off"), ("ONAM", "On"),
-                    ("OUT", r + "_WAIT PP"), ("FLNK", r + "_AUTO")])
-            recordND("bo", r + "_AUTO", dv, fp,
+                    ("OUT", r + "WT PP"), ("FLNK", r + "AU")])
+            recordND("bo", r + "AU", dv, fp,
                    [("ZNAM", "Off"), ("ONAM", "On"), ("PINI", "YES"),
-                    ("OUT", r + " PP"), ("FLNK", r + "_CALC")], "VAL")
-            recordND("calcout", r + "_CALC", None, fp,
+                    ("OUT", r + " PP"), ("FLNK", r + "CA")], "VAL")
+            recordND("calcout", r + "CA", None, fp,
                    [("INPA", r + " CPP"), ("CALC", "(A>0)?0:1"),
                     ("OOPT", "Transition To Zero"), ("DOPT", "Use CALC"),
-                    ("OUT", r + "_WAIT PP")])
-            out.append('    field(REQ%d,       "%s_STARTWAIT.PROC PP")\n' % (i % 9, r))
-            out.append('    field(STATE%d,     "%s_CALC CPP")\n' % (i % 9, r))
+                    ("OUT", r + "WT PP")])
+            out.append('    field(REQ%d,       "%sSW.PROC PP")\n' % (i % 9, r))
+            out.append('    field(STATE%d,     "%sCA CPP")\n' % (i % 9, r))
             i = i + 1
             continue
-        if l[0] == 'ABORT':
-            record("seq", "%s:_SEQ%d" % (name, i), None, fp, [
+        if l[1] == 'ABORT':
+            record("seq", "%s:SQ%d" % (name, i), None, fp, [
                    ("SELM", "All"),
-                   ("DOL1", "2"), ("LNK1", "%s:_STATE%d PP" % (name, i)),
+                   ("DOL1", "2"), ("LNK1", "%s:_S%d PP" % (name, i)),
                    ("DLY2", 1), 
-                   ("DOL2", "1"), ("LNK2", "%s:_STATE%d PP" % (name, i))])
-            record("longout", "%s:_STATE%d" % (name, i), "1", fp)
+                   ("DOL2", "1"), ("LNK2", "%s:_S%d PP" % (name, i))])
+            record("longout", "%s:_S%d" % (name, i), "1", fp)
             out.append('    field(PRE%d,       "%s")\n' % (i % 9, r))
-            out.append('    field(REQ%d,       "%s:_SEQ%d.PROC PP")\n' % (i % 9, name, i))
-            out.append('    field(STATE%d,     "%s:_STATE%d CPP")\n' % (i % 9, name, i))
+            out.append('    field(REQ%d,       "%s:SQ%d.PROC PP")\n' % (i % 9, name, i))
+            out.append('    field(STATE%d,     "%s:_S%d CPP")\n' % (i % 9, name, i))
             
             i = i + 1
             continue
-        if l[0] == 'DELAY':
-            record("longout", "%s:_STATE%d" % (name, i), "0", fp)
-            record("seq", "%s:_DELAY%d" % (name, i), None, fp, [
+        if l[1] == 'DELAY':
+            record("longout", "%s:_S%d" % (name, i), "0", fp)
+            record("seq", "%s:_D%d" % (name, i), None, fp, [
                    ("SELM", "All"),
-                   ("DOL1", "1"), ("LNK1", "%s:_STATE%d PP" % (name, i)),
-                   ("DLY2", r), ("DOL2", "0"), ("LNK2", "%s:_STATE%d PP" % (name, i))])
-            out.append('    field(REQ%d,       "%s:_DELAY%d.PROC PP")\n' % (i % 9, name, i))
-            out.append('    field(STATE%d,     "%s:_STATE%d CPP")\n' % (i % 9, name, i))
+                   ("DOL1", "1"), ("LNK1", "%s:_S%d PP" % (name, i)),
+                   ("DLY2", r), ("DOL2", "0"), ("LNK2", "%s:_S%d PP" % (name, i))])
+            out.append('    field(REQ%d,       "%s:_D%d.PROC PP")\n' % (i % 9, name, i))
+            out.append('    field(STATE%d,     "%s:_S%d CPP")\n' % (i % 9, name, i))
             i = i + 1
             continue
-        if l[0] == 'FINISH':
-            record("calcout", "%s:_FIN" % (name), None, fp, [
+        if l[1] == 'FINISH':
+            record("calcout", "%s:_F" % (name), None, fp, [
                    ("INPA", "%s.STATE CPP NMS" % (name)),
                    ("CALC", "A==1"),
                    ("OOPT", "Transition To Zero"),
                    ("DOPT", "Use OCAL"),
                    ("OCAL", "1"),
-                   ("OUT",  "%s:_FIN_SEQ.REQ PP" % (name))
+                   ("OUT",  "%s:FS.REQ PP" % (name))
                    ])
-            generate_seq("%s:_FIN_SEQ" % (name), l[1], fp);
+            generate_seq("%s:FS" % (name), l[2], fp);
             continue
-        if l[0] == 'IF' or l[0] == 'WHILE':
-            record("longout", "%s:_STATE%d" % (name, i), "0", fp)
-            record("calcout", "%s:_MONST%d" % (name, i), None, fp, [
-                   ("INPA", "%s:_SEQ%d.STATE CPP" % (name, i)),
-                   ("CALC", "A==0||A==2" if l[0] == 'IF' else "A==2"),
-                   ("OOPT", "When Non-zero"),
-                   ("DOPT", "Use OCAL"),
-                   ("OCAL", "A"),
-                   ("OUT",  "%s:_STATE%d PP" % (name, i))
-                   ])
-            record("stringout", "%s:_SNAME%d" % (name, i), "DONE", fp)
-            record("seq", "%s:_START%d" % (name, i), None, fp, [
+        if l[1] == 'IF' or l[1] == 'WHILE':
+            if len(l[2]) > 1:
+                testcond  = l[2][0]
+                name_expr = parse_expr(l[2][1])
+            else:
+                testcond  = "Testing Condition"
+                name_expr = parse_expr(l[2][0])
+            record("longout", "%s:_S%d" % (name, i), "0", fp)
+            record("stringout", "%s:SN%d" % (name, i), "DONE", fp)
+            record("seq", "%s:ST%d" % (name, i), None, fp, [
                    ("SELM", "All"),
                    ("DOL1", "1"),
-                   ("LNK1", "%s:_STATE%d PP" % (name, i)),
+                   ("LNK1", "%s:_S%d PP" % (name, i)),
                    ("DOL2", "1"),
-                   ("LNK2", "%s:_SETNAME%d.PROC" % (name, i)),
+                   ("LNK2", "%s:_N%d.PROC" % (name, i)),
                    ("DOL3", "1"),
-                   ("LNK3", "%s:_TEST%d.PROC" % (name, i))])
-            record("stringout", "%s:_SETNAME%d" % (name, i), "Testing Condition", fp,
-                   [("OUT", "%s:_SNAME%d PP" % (name, i))])
-            record("stringout", "%s:_MONNAME%d" % (name, i), None, fp,
+                   ("LNK3", "%s:_T%d.PROC" % (name, i))])
+            record("stringout", "%s:_N%d" % (name, i), testcond, fp,
+                   [("OUT", "%s:SN%d PP" % (name, i))])
+            record("calcout", "%s:MS%d" % (name, i), None, fp, 
+                   [("INPA", "%s:SQ%d.STATE CPP" % (name, i)),
+                    ("CALC", "A==0||A==2" if l[1] == 'IF' else "A==2"),
+                    ("OOPT", "When Non-zero"),
+                    ("DOPT", "Use OCAL"),
+                    ("OCAL", "A"),
+                    ("OUT",  "%s:_S%d PP" % (name, i))])
+            record("stringout", "%s:MN%d" % (name, i), None, fp,
                    [("OMSL", "closed_loop"),
-                    ("DOL",  "%s:_SEQ%d.STEPNAME CPP" % (name, i)),
-                    ("OUT",  "%s:_SNAME%d PP" % (name, i))])
-            name_expr = parse_expr(l[1][1])
-            record("calcout", "%s:_TEST%d" % (name, i), None, fp, [
-                   ("INPA", "%s NPP" % name_expr[0]),
-                   ("CALC", "(A%s)?1:2" % name_expr[1]),
-                   ("OOPT", "Every Time"),
-                   ("DOPT", "Use CALC"),
-                   ("OUT",  "%s:_SELECT%d.SELN PP" % (name, i))
-                   ])
-            record("seq", "%s:_SELECT%d" % (name, i), None, fp, [
+                    ("DOL",  "%s:SQ%d.STEPNAME CPP" % (name, i)),
+                    ("OUT",  "%s:SN%d PP" % (name, i))])
+            record("calcout", "%s:_T%d" % (name, i), None, fp, 
+                   [("INPA", "%s NPP" % name_expr[0]),
+                    ("CALC", "(A%s)?1:2" % name_expr[1]),
+                    ("OOPT", "Every Time"),
+                    ("DOPT", "Use CALC"),
+                    ("OUT",  "%s:SL%d.SELN PP" % (name, i))])
+            if idx+1 < len(seq) and seq[idx+1][1] == "ELSE":
+                l2 = "%s:_E%d.REQ PP" % (name, i)
+                v2 = "1"
+                record("calcout", "%s:ES%d" % (name, i), None, fp, 
+                       [("INPA", "%s:_E%d.STATE CPP" % (name, i)),
+                        ("CALC", "A==0||A==2" if l[1] == 'IF' else "A==2"),
+                        ("OOPT", "When Non-zero"),
+                        ("DOPT", "Use OCAL"),
+                        ("OCAL", "A"),
+                        ("OUT",  "%s:_S%d PP" % (name, i))])
+                record("stringout", "%s:EN%d" % (name, i), None, fp,
+                       [("OMSL", "closed_loop"),
+                        ("DOL",  "%s:_E%d.STEPNAME CPP" % (name, i)),
+                        ("OUT",  "%s:SN%d PP" % (name, i))])
+                generate_seq("%s:_E%d" % (name, i), seq[idx+1][2], fp)
+            else:
+                l2 = "%s:_S%d PP" % (name, i)
+                v2 = "0"
+            record("seq", "%s:SL%d" % (name, i), None, fp, [
                    ("SELM", "Specified"),
                    ("DOL1", "1"),
-                   ("LNK1",  "%s:_SEQ%d.REQ PP" % (name, i)),
-                   ("DOL2", "0"),
-                   ("LNK2", "%s:_STATE%d PP" % (name, i)),
+                   ("LNK1",  "%s:SQ%d.REQ PP" % (name, i)),
+                   ("DOL2", v2),
+                   ("LNK2", l2)
                    ])
-            if l[0] == "WHILE":
-                l[2].append(("field", ["FLNK", "%s:_START%d" % (name, i)]))
-            generate_seq("%s:_SEQ%d" % (name, i), l[2], fp);
+            if l[1] == "WHILE":
+                l[3].append([l[0], "field", ["FLNK", "%s:ST%d" % (name, i)]])
+            generate_seq("%s:SQ%d" % (name, i), l[3], fp);
                 
-            out.append('    field(REQ%d,       "%s:_START%d.PROC")\n' % (i % 9, name, i))
-            out.append('    field(ABRT%d,      "%s:_SEQ%d.ABRT PP")\n' % (i % 9, name, i))
-            out.append('    field(STATE%d,     "%s:_STATE%d CPP")\n' % (i % 9, name, i))
-            out.append('    field(STEPNAME%d,  "%s:_SNAME%d CPP")\n' % (i % 9, name, i))
+            out.append('    field(REQ%d,       "%s:ST%d.PROC")\n' % (i % 9, name, i))
+            out.append('    field(ABRT%d,      "%s:SQ%d.ABRT PP")\n' % (i % 9, name, i))
+            out.append('    field(STATE%d,     "%s:_S%d CPP")\n' % (i % 9, name, i))
+            out.append('    field(STEPNAME%d,  "%s:SN%d CPP")\n' % (i % 9, name, i))
             i = i + 1
             continue
-        if l[0] == 'WAIT':
-            if len(l[1]) == 3:
-                t = l[1][2]
+        if l[1] == 'WAIT':
+            if len(l[2]) == 3:
+                t = l[2][2]
             else:
                 t = "-1"
-            record("longout", "%s:_TIMEOUT%d" % (name, i), t, fp)
-            record("longout", "%s:_COUNT%d" % (name, i), "0", fp)
-            record("longout", "%s:_ABRT%d" % (name, i), "2", fp,
-                   [("OUT",  "%s:_STATE%d PP" % (name, i))])
-            record("longout", "%s:_STATE%d" % (name, i), "0", fp)
-            record("calcout", "%s:_CALCC%d" % (name, i), None, fp,
-                   [("INPA", "%s:_TIMEOUT%d NPP" % (name, i)),
-                    ("INPB", "%s:_COUNT%d NPP" % (name, i)),
-                    ("INPC", "%s:_STATE%d NPP" % (name, i)),
+            record("longout", "%s:TM%d" % (name, i), t, fp)
+            record("longout", "%s:CT%d" % (name, i), "0", fp)
+            record("longout", "%s:AB%d" % (name, i), "2", fp,
+                   [("OUT",  "%s:_S%d PP" % (name, i))])
+            record("longout", "%s:_S%d" % (name, i), "0", fp)
+            record("calcout", "%s:CC%d" % (name, i), None, fp,
+                   [("INPA", "%s:TM%d NPP" % (name, i)),
+                    ("INPB", "%s:CT%d NPP" % (name, i)),
+                    ("INPC", "%s:_S%d NPP" % (name, i)),
                     ("SCAN", "1 second"),
                     ("CALC", "(C==1)&&((A==-1)||(B!=0))"),
                     ("DOPT", "Use OCAL"),
                     ("OOPT", "When Non-zero"),
-                    ("OUT",  "%s:_COUNT%d PP" % (name, i)),
+                    ("OUT",  "%s:CT%d PP" % (name, i)),
                     ("OCAL", "(B<-10||B==0)?(B?-1:0):(B-1)")])
-            name_expr = parse_expr(l[1][1])
-            record("calcout", "%s:_CALCS%d" % (name, i), None, fp,
-                   [("INPA", "%s:_STATE%d CPP" % (name, i)),
-                    ("INPB", "%s:_COUNT%d CPP" % (name, i)),
+            name_expr = parse_expr(l[2][1])
+            record("calcout", "%s:CS%d" % (name, i), None, fp,
+                   [("INPA", "%s:_S%d CPP" % (name, i)),
+                    ("INPB", "%s:CT%d CPP" % (name, i)),
                     ("INPC", "%s CPP" % name_expr[0]),
                     ("CALC", "(A!=1)?A:((C%s)?0:(B==0?2:1))" % name_expr[1]),
                     ("DOPT", "Use CALC"),
                     ("OOPT", "Every Time"),
-                    ("OUT",  "%s:_STATE%d PP" % (name, i))])
-            record("seq", "%s:_START%d" % (name, i), None, fp, [
+                    ("OUT",  "%s:_S%d PP" % (name, i))])
+            record("seq", "%s:ST%d" % (name, i), None, fp, [
                    ("SELM", "All"),
                    ("DOL1", "1"),
-                   ("LNK1", "%s:_STATE%d PP" % (name, i)),
-                   ("DOL2", "%s:_TIMEOUT%d NPP" % (name, i)),
-                   ("LNK2", "%s:_COUNT%d PP" % (name, i))])
-            out.append('    field(REQ%d,       "%s:_START%d.PROC")\n' % (i % 9, name, i))
-            out.append('    field(ABRT%d,      "%s:_ABRT%d.PROC")\n' % (i % 9, name, i))
-            out.append('    field(STATE%d,     "%s:_STATE%d CPP")\n' % (i % 9, name, i))
+                   ("LNK1", "%s:_S%d PP" % (name, i)),
+                   ("DOL2", "%s:TM%d NPP" % (name, i)),
+                   ("LNK2", "%s:CT%d PP" % (name, i))])
+            out.append('    field(REQ%d,       "%s:ST%d.PROC")\n' % (i % 9, name, i))
+            out.append('    field(ABRT%d,      "%s:AB%d.PROC")\n' % (i % 9, name, i))
+            out.append('    field(STATE%d,     "%s:_S%d CPP")\n' % (i % 9, name, i))
             i = i + 1
             continue
-        if l[0] == 'ASSIGN_CALC':
+        if l[1] == 'ASSIGN_CALC':
             ll = []
-            for x in l[2]:
-                if x[0] == 'field':
-                    ll.append((x[1][0], x[1][1]))
+            for x in l[3]:
+                if x[1] == 'field':
+                    ll.append((x[2][0], x[2][1]))
                 else:
                     raise IoError("ASSIGN_CALC can only contain fields!")
-            #ll.append(("FLNK", "%s:_VAL%d"))
-            record("calc", "%s:_CALC%d" % (name, i), None, fp, ll)
-            record("ao", "%s:_VAL%d" % (name, i), None, fp, [
+            #ll.append(("FLNK", "%s:_V%d"))
+            record("calc", "%s:CA%d" % (name, i), None, fp, ll)
+            record("ao", "%s:_V%d" % (name, i), None, fp, [
                    ("OMSL", "closed_loop"),
-                   ("DOL",  "%s:_CALC%d PP" % (name, i)),
-                   ("OUT",  "%s PP" % l[1][1])])
-            if len(l[1]) > 2:
-                if l[1][2] == 'bo':
-                    record(l[1][2], l[1][1], None, fp, 
+                   ("DOL",  "%s:CA%d PP" % (name, i)),
+                   ("OUT",  "%s PP" % l[2][1])])
+            if len(l[2]) > 2:
+                if l[2][2] == 'bo':
+                    record(l[2][2], l[2][1], None, fp, 
                            [('ZNAM', 'False'), ('ONAM', 'True')])
                 else:
-                    record(l[1][2], l[1][1], None, fp)
-            out.append('    field(REQ%d,       "%s:_VAL%d.PROC")\n' % (i % 9, name, i))
+                    record(l[2][2], l[2][1], None, fp)
+            out.append('    field(REQ%d,       "%s:_V%d.PROC")\n' % (i % 9, name, i))
             i = i + 1
             continue
-        if l[0][:4] == 'SET_':
-            td = tdict[l[0][4:]]
-            if not td[1](l[1][2]):
-                print "WARNING: %s for %s: %s does not look like it has type %s!" % (l[0], l[1][1], l[1][2], l[0][4:])
+        if l[1][:4] == 'SET_':
+            td = tdict[l[1][4:]]
+            if not td[1](l[2][2]):
+                print "WARNING: %s for %s: %s does not look like it has type %s!" % (l[1], l[2][1], l[2][2], l[1][4:])
                 if td[2]:
                     sys.exit(1)
-            record(td[0], "%s:_VAL%d" % (name, i), l[1][2], fp, [
+            record(td[0], "%s:_V%d" % (name, i), l[2][2], fp, [
                    ("OMSL", "supervisory"),
-                   ("OUT",  "%s PP" % l[1][1])])
-            out.append('    field(REQ%d,       "%s:_VAL%d.PROC")\n' % (i % 9, name, i))
+                   ("OUT",  "%s PP" % l[2][1])])
+            out.append('    field(REQ%d,       "%s:_V%d.PROC")\n' % (i % 9, name, i))
             i = i + 1
             continue;
-        if l[0][:7] == 'ASSIGN_':
-            td = tdict[l[0][7:]]
-            if td[1](l[1][2]):
-                print "WARNING: %s for %s: %s does not look like a PV!" % (l[0], l[1][1], l[1][2])
+        if l[1][:7] == 'ASSIGN_':
+            td = tdict[l[1][7:]]
+            if td[1](l[2][2]):
+                print "WARNING: %s for %s: %s does not look like a PV!" % (l[1], l[2][1], l[2][2])
                 if td[2]:
                     sys.exit(1)
-            record(td[0], "%s:_VAL%d" % (name, i), None, fp, [
+            record(td[0], "%s:_V%d" % (name, i), None, fp, [
                    ("OMSL", "closed_loop"),
-                   ("DOL",  "%s NPP" % l[1][2]),
-                   ("OUT",  "%s PP" % l[1][1])])
-            out.append('    field(REQ%d,       "%s:_VAL%d.PROC")\n' % (i % 9, name, i))
+                   ("DOL",  "%s NPP" % l[2][2]),
+                   ("OUT",  "%s PP" % l[2][1])])
+            out.append('    field(REQ%d,       "%s:_V%d.PROC")\n' % (i % 9, name, i))
             i = i + 1
             continue;
-        if l[0] == 'EXTERN':
+        if l[1] == 'EXTERN':
             out.append('    field(PRE%d,       "%s")\n' % (i % 9, r))
         # These are needed for both ASUB and EXTERN.
-        out.append('    field(REQ%d,       "%s:_REQ%d PP")\n' % (i % 9, name, i))
-        out.append('    field(ABRT%d,      "%s:_ABRT%d PP")\n' % (i % 9, name, i))
-        out.append('    field(STATE%d,     "%s:_STATE%d CPP")\n' % (i % 9, name, i))
-        out.append('    field(STEPNAME%d,  "%s:_SNAME%d CPP")\n' % (i % 9, name, i))
-        record("longout", "%s:_REQ%d" % (name, i), "0", fp)
-        record("longout", "%s:_ABRT%d" % (name, i), "0", fp)
-        record("longout", "%s:_STATE%d" % (name, i), "0", fp)
-        record("stringout", "%s:_SNAME%d" % (name, i), "DONE", fp)
-        if l[0] == 'ASUB':
-            record("longout", "%s:_ACTIVE%d" % (name, i), "0", fp)
-            fp.write('record(aSub, "%s:_STEP%d") {\n' % (name, i))
+        out.append('    field(REQ%d,       "%s:RQ%d PP")\n' % (i % 9, name, i))
+        out.append('    field(ABRT%d,      "%s:AB%d PP")\n' % (i % 9, name, i))
+        out.append('    field(STATE%d,     "%s:_S%d CPP")\n' % (i % 9, name, i))
+        out.append('    field(STEPNAME%d,  "%s:SN%d CPP")\n' % (i % 9, name, i))
+        record("longout", "%s:RQ%d" % (name, i), "0", fp)
+        record("longout", "%s:AB%d" % (name, i), "0", fp)
+        record("longout", "%s:_S%d" % (name, i), "0", fp)
+        record("stringout", "%s:SN%d" % (name, i), "DONE", fp)
+        if l[1] == 'ASUB':
+            record("longout", "%s:_A%d" % (name, i), "0", fp)
+            fp.write('record(aSub, "%s:SP%d") {\n' % (name, i))
             fp.write('    field(SNAM,  "aSubControl")\n')
             fp.write('    field(SCAN,  "Passive")\n')
             fp.write('    field(EFLG,  "ON CHANGE")\n')
-            fp.write('    field(INPA,  "%s:_REQ%d CPP")\n' % (name, i))
+            fp.write('    field(INPA,  "%s:RQ%d CPP")\n' % (name, i))
             fp.write('    field(FTA,   "LONG")\n')
             fp.write('    field(NOA,   "1")\n')
-            fp.write('    field(INPB,  "%s:_ABRT%d CPP")\n' % (name, i))
+            fp.write('    field(INPB,  "%s:AB%d CPP")\n' % (name, i))
             fp.write('    field(FTB,   "LONG")\n')
             fp.write('    field(NOB,   "1")\n')
             # A little weird, but this is so we process passive, but 
             # still get the current value!
-            fp.write('    field(INPC,  "%s:_STATE%d NPP")\n' % (name, i))
+            fp.write('    field(INPC,  "%s:_S%d NPP")\n' % (name, i))
             fp.write('    field(FTC,   "LONG")\n')
             fp.write('    field(NOC,   "1")\n')
-            fp.write('    field(INPD,  "%s:_STATE%d CPP")\n' % (name, i))
+            fp.write('    field(INPD,  "%s:_S%d CPP")\n' % (name, i))
             fp.write('    field(FTD,   "LONG")\n')
             fp.write('    field(NOD,   "1")\n')
-            fp.write('    field(OUTA,  "%s:_REQ%d PP")\n' % (name, i))
+            fp.write('    field(OUTA,  "%s:RQ%d PP")\n' % (name, i))
             fp.write('    field(FTVA,  "LONG")\n')
             fp.write('    field(NOVA,  "1")\n')
-            fp.write('    field(OUTB,  "%s:_ABRT%d PP")\n' % (name, i))
+            fp.write('    field(OUTB,  "%s:AB%d PP")\n' % (name, i))
             fp.write('    field(FTVB,  "LONG")\n')
             fp.write('    field(NOVB,  "1")\n')
-            fp.write('    field(OUTC,  "%s:_STATE%d PP")\n' % (name, i))
+            fp.write('    field(OUTC,  "%s:_S%d PP")\n' % (name, i))
             fp.write('    field(FTVC,  "LONG")\n')
             fp.write('    field(NOVC,  "1")\n')
-            fp.write('    field(OUTD,  "%s:_ACTIVE%d PP")\n' % (name, i))
+            fp.write('    field(OUTD,  "%s:_A%d PP")\n' % (name, i))
             fp.write('    field(FTVD,  "LONG")\n')
             fp.write('    field(NOVD,  "1")\n')
-            fp.write('    field(OUTE,  "%s:_PROC%d.VALT NPP")\n' % (name, i))
+            fp.write('    field(OUTE,  "%s:_P%d.VALT NPP")\n' % (name, i))
             fp.write('    field(FTVE,  "STRING")\n')
             fp.write('    field(NOVE,  "1")\n')
-            fp.write('    field(OUTF,  "%s:_PROC%d.VALU NPP")\n' % (name, i))
+            fp.write('    field(OUTF,  "%s:_P%d.VALU NPP")\n' % (name, i))
             fp.write('    field(FTVF,  "LONG")\n')
             fp.write('    field(NOVF,  "1")\n')
             fp.write('}\n\n')
-            fp.write('record(aSub, "%s:_PROC%d") {\n' % (name, i))
+            fp.write('record(aSub, "%s:_P%d") {\n' % (name, i))
             fp.write('    field(SNAM,  "%s")\n' % r)
             fp.write('    field(EFLG,  "ON CHANGE")\n')
-            fp.write('    field(SDIS,  "%s:_ACTIVE%d")\n' % (name, i))
+            fp.write('    field(SDIS,  "%s:_A%d")\n' % (name, i))
             fp.write('    field(DISV,  "0")\n')
             have_scan = False
-            if len(l) == 3:
-                for ll in l[2]:
-                    if ll[0] not in ['field', 'COMMENT']:
-                        raise IOError("Syntax error: field expected!")
-                    if ll[0] == "COMMENT":
-                        fp.write("    %s\n" % ll[1])
+            if len(l) == 4:
+                for ll in l[3]:
+                    if ll[1] not in ['field', 'COMMENT']:
+                        raise IOError("Line %d: Syntax error: field expected!" % ll[0])
+                    if ll[1] == "COMMENT":
+                        fp.write("    %s\n" % ll[2])
                     else:
-                        fp.write('    field(%s"%s")\n' % (do_pad(ll[1][0] + ',', 6),
-                                                          ll[1][1]))
-                        if ll[1][0] == 'SCAN':
+                        fp.write('    field(%s"%s")\n' % (do_pad(ll[2][0] + ',', 6),
+                                                          ll[2][1]))
+                        if ll[2][0] == 'SCAN':
                             have_scan = True
-            fp.write('    field(OUTT,  "%s:_SNAME%d PP")\n' % (name, i))
+            fp.write('    field(OUTT,  "%s:SN%d PP")\n' % (name, i))
             fp.write('    field(FTVT,  "STRING")\n')
             fp.write('    field(NOVT,  "1")\n')
-            fp.write('    field(OUTU,  "%s:_STATE%d PP")\n' % (name, i))
+            fp.write('    field(OUTU,  "%s:_S%d PP")\n' % (name, i))
             fp.write('    field(FTVU,  "LONG")\n')
             fp.write('    field(NOVU,  "1")\n')
             if not have_scan:
@@ -464,122 +493,122 @@ def generate_seq(name, seq, fp):
             fp.write('}\n\n')
             i = i + 1
             continue
-        if l[0] == 'EXTERN':
-            record("longout", "%s:_PID%d" % (name, i), "-1", fp)
-            record("longout", "%s:_PIPE%d" % (name, i), "-1", fp)
-            record("aSub", "%s:_START%d" % (name, i), None, fp,
+        if l[1] == 'EXTERN':
+            record("longout", "%s:PD%d" % (name, i), "-1", fp)
+            record("longout", "%s:PP%d" % (name, i), "-1", fp)
+            record("aSub", "%s:ST%d" % (name, i), None, fp,
                    [("SNAM", "ProcessInit"),
                     ("EFLG", "ALWAYS"),
-                    ("INPA", "%s:_PID%d CPP" % (name, i)),
+                    ("INPA", "%s:PD%d CPP" % (name, i)),
                     ("FTA",  "LONG"),
                     ("NOA",  "1"),
-                    ("INPB", "%s:_REQ%d CPP" % (name, i)),
+                    ("INPB", "%s:RQ%d CPP" % (name, i)),
                     ("FTB",  "LONG"),
                     ("NOB",  "1"),
-                    ("OUTA", "%s:_STATE%d PP" % (name, i)),
+                    ("OUTA", "%s:_S%d PP" % (name, i)),
                     ("FTVA", "LONG"),
                     ("NOVA", "1"),
-                    ("OUTB", "%s:_SNAME%d PP" % (name, i)),
+                    ("OUTB", "%s:SN%d PP" % (name, i)),
                     ("FTVB", "STRING"),
                     ("NOVB", "1"),
-                    ("OUTC", "%s:_STEP%d.PROC" % (name, i)),
+                    ("OUTC", "%s:SP%d.PROC" % (name, i)),
                     ("FTVC", "LONG"),
                     ("NOVC", "1")])
-            record("stringout", "%s:_SNAMENAME%d" % (name, i), 
-                   "%s:_SNAME%d" % (name, i), fp)
-            record("aSub", "%s:_PIDMON%d" % (name, i), None, fp,
+            record("stringout", "%s:_N%d" % (name, i), 
+                   "%s:SN%d" % (name, i), fp)
+            record("aSub", "%s:PM%d" % (name, i), None, fp,
                    [("SNAM",  "ProcessMonitor"),
                     ("EFLG",  "ON CHANGE"),
                     ("SCAN",  ".1 second"),
-                    ("SDIS",  "%s:_PID%d NPP" % (name, i)),
+                    ("SDIS",  "%s:PD%d NPP" % (name, i)),
                     ("DISV",  "-1"),
-                    ("INPA",  "%s:_PID%d NPP" % (name, i)),
+                    ("INPA",  "%s:PD%d NPP" % (name, i)),
                     ("FTA",   "LONG"),
                     ("NOA",   "1"),
-                    ("INPB",  "%s:_ABRT%d NPP" % (name, i)),
+                    ("INPB",  "%s:AB%d NPP" % (name, i)),
                     ("FTB",   "LONG"),
                     ("NOB",   "1"),
-                    ("INPC",  "%s:_SNAME%d NPP" % (name, i)),
+                    ("INPC",  "%s:SN%d NPP" % (name, i)),
                     ("FTC",   "STRING"),
                     ("NOC",   "1"),
-                    ("INPD",  "%s:_STATE%d NPP" % (name, i)),
+                    ("INPD",  "%s:_S%d NPP" % (name, i)),
                     ("FTD",   "LONG"),
                     ("NOD",   "1"),
-                    ("INPE",  "%s:_PIPE%d NPP" % (name, i)),
+                    ("INPE",  "%s:PP%d NPP" % (name, i)),
                     ("FTE",   "LONG"),
                     ("NOE",   "1"),
-                    ("OUTA",  "%s:_PID%d PP" % (name, i)),
+                    ("OUTA",  "%s:PD%d PP" % (name, i)),
                     ("FTVA",  "LONG"),
                     ("NOVA",  "1"),
-                    ("OUTB",  "%s:_ABRT%d PP" % (name, i)),
+                    ("OUTB",  "%s:AB%d PP" % (name, i)),
                     ("FTVB",   "LONG"),
                     ("NOVB",   "1"),
-                    ("OUTC",  "%s:_SNAME%d PP" % (name, i)),
+                    ("OUTC",  "%s:SN%d PP" % (name, i)),
                     ("FTVC",   "STRING"),
                     ("NOVC",   "1"),
-                    ("OUTD",  "%s:_STATE%d PP" % (name, i)),
+                    ("OUTD",  "%s:_S%d PP" % (name, i)),
                     ("FTVD",  "LONG"),
                     ("NOVD",  "1"),
-                    ("OUTE",  "%s:_PIPE%d PP" % (name, i)),
+                    ("OUTE",  "%s:PP%d PP" % (name, i)),
                     ("FTVE",  "LONG"),
                     ("NOVE",  "1")])
-            if len(l) != 3:
-                raise IOError("EXTERN must have a PROG field!")
+            if len(l) != 4:
+                raise IOError("Line %d: EXTERN must have a PROG field!" % l[0])
             prog = ""
-            for ll in l[2]:
-                if ll[0] not in ['field', 'COMMENT']:
-                    raise IOError("Syntax error: field expected!")
-                if ll[0] == 'field':
-                    if ll[1][0] == 'PROG':
-                        prog = ll[1][1]
+            for ll in l[3]:
+                if ll[1] not in ['field', 'COMMENT']:
+                    raise IOError("Line %d: Syntax error: field expected!" % ll[0])
+                if ll[1] == 'field':
+                    if ll[2][0] == 'PROG':
+                        prog = ll[2][1]
                     else:
-                        raise IOError("Unknown field for EXTERN: %s" % ll[1][0])
+                        raise IOError("Line %d: Unknown field for EXTERN: %s" % (ll[0], ll[2][0]))
             if prog == "":
-                raise IOError("EXTERN must have a PROG field!")
+                raise IOError("Line %d: EXTERN must have a PROG field!" % l[0])
             ll = [x.strip() for x in prog.split()]
             for (n, lll) in enumerate(ll):
-                record("stringout", "%s:_PROG%d_%d" % (name, i, n), lll, fp)
-            record("longout", "%s:_ARGS%d" % (name, i), len(ll), fp)
-            fp.write('record(aSub, "%s:_STEP%d") {\n' % (name, i))
+                record("stringout", "%s:PG%d_%d" % (name, i, n), lll, fp)
+            record("longout", "%s:AG%d" % (name, i), len(ll), fp)
+            fp.write('record(aSub, "%s:SP%d") {\n' % (name, i))
             fp.write('    field(SNAM,  "ProcessSpawn")\n')
             fp.write('    field(SCAN,  "Passive")\n')
             fp.write('    field(EFLG,  "ON CHANGE")\n')
             # We seem to have a race, so let's let the record set the state quickly,
             # *then* poke the actual spawn routine.
-            fp.write('    field(INPA,  "%s:_REQ%d NPP")\n' % (name, i))
+            fp.write('    field(INPA,  "%s:RQ%d NPP")\n' % (name, i))
             fp.write('    field(FTA,   "LONG")\n')
             fp.write('    field(NOA,   "1")\n')
-            fp.write('    field(INPB,  "%s:_STATE%d NPP")\n' % (name, i))
+            fp.write('    field(INPB,  "%s:_S%d NPP")\n' % (name, i))
             fp.write('    field(FTB,   "LONG")\n')
             fp.write('    field(NOB,   "1")\n')
-            fp.write('    field(INPC,  "%s:_PID%d NPP")\n' % (name, i))
+            fp.write('    field(INPC,  "%s:PD%d NPP")\n' % (name, i))
             fp.write('    field(FTC,   "LONG")\n')
             fp.write('    field(NOC,   "1")\n')
-            fp.write('    field(INPD,  "%s:_PIPE%d NPP")\n' % (name, i))
+            fp.write('    field(INPD,  "%s:PP%d NPP")\n' % (name, i))
             fp.write('    field(FTD,   "LONG")\n')
             fp.write('    field(NOD,   "1")\n')
-            fp.write('    field(INPE,  "%s:_ARGS%d NPP")\n' % (name, i))
+            fp.write('    field(INPE,  "%s:AG%d NPP")\n' % (name, i))
             fp.write('    field(FTE,   "LONG")\n')
             fp.write('    field(NOE,   "1")\n')
-            fp.write('    field(INPF,  "%s:_SNAMENAME%d NPP")\n' % (name, i))
+            fp.write('    field(INPF,  "%s:_N%d NPP")\n' % (name, i))
             fp.write('    field(FTF,   "STRING")\n')
             fp.write('    field(NOF,   "1")\n')
             for (n, lll) in enumerate(ll):
                 c = chr(ord('G') + n)
-                fp.write('    field(INP%s,  "%s:_PROG%d_%d NPP")\n' % 
+                fp.write('    field(INP%s,  "%s:PG%d_%d NPP")\n' % 
                          (c, name, i, n))
                 fp.write('    field(FT%s,   "STRING")\n' %  c)
                 fp.write('    field(NO%s,   "1")\n' % c)
-            fp.write('    field(OUTA,  "%s:_REQ%d PP")\n' % (name, i))
+            fp.write('    field(OUTA,  "%s:RQ%d PP")\n' % (name, i))
             fp.write('    field(FTVA,  "LONG")\n')
             fp.write('    field(NOVA,  "1")\n')
-            fp.write('    field(OUTB,  "%s:_STATE%d PP")\n' % (name, i))
+            fp.write('    field(OUTB,  "%s:_S%d PP")\n' % (name, i))
             fp.write('    field(FTVB,  "LONG")\n')
             fp.write('    field(NOVB,  "1")\n')
-            fp.write('    field(OUTC,  "%s:_PIPE%d PP")\n' % (name, i))
+            fp.write('    field(OUTC,  "%s:PP%d PP")\n' % (name, i))
             fp.write('    field(FTVC,  "LONG")\n')
             fp.write('    field(NOVC,  "1")\n')
-            fp.write('    field(OUTD,  "%s:_PID%d PP")\n' % (name, i))
+            fp.write('    field(OUTD,  "%s:PD%d PP")\n' % (name, i))
             fp.write('    field(FTVD,  "LONG")\n')
             fp.write('    field(NOVD,  "1")\n')
             fp.write('}\n\n')
@@ -600,8 +629,8 @@ def expand(lines, fp):
         while lines[i][0] != '}':
             i = i + 1
         #print "\nSequence from line %d to line %d" % (start, i)
-        d = process(lines[start:i+1])
-        generate_seq(d[0][1][0], d[0][2], fp)
+        d = process(lines[start:i+1], start)
+        generate_seq(d[0][2][0], d[0][3], fp)
         i = i + 1
 
 if __name__ == '__main__':

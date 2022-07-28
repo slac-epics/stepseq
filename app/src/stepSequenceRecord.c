@@ -129,15 +129,93 @@ static long init_record(struct stepSequenceRecord *prec, int pass)
         }                          \
     } while (0)
 
+static unsigned short set_statename(struct stepSequenceRecord *prec)
+{
+    char sn[128], *s;
+    int st;
+
+    if (prec->state != selSSRstate_Done) {
+        /*
+         * OK, this is now more complicated than originally thought.
+         * We really want this to be "PREn: STEPn".  But if someone is
+         * aborted, we want to prepend "ABORT:"  But then "STEPn" might
+         * already reflect this!
+         */
+        int abort = (prec->state == selSSRstate_Aborted);
+        char *pre = (&prec->pre0)[prec->val];
+        char buf[128], *t = buf, *u;
+
+	if ((&prec->stepname0)[prec->val].type == CONSTANT)
+	    buf[0] = 0;
+	else {
+	    st = dbGetLink((&prec->stepname0) + (prec->val), 
+			   DBR_STRING, t, 0, 0);
+	    if (!st) {
+		DPRINTF(("%s: stepname%d read: %s\n", prec->name, prec->val, t));
+	    }
+	    if (st || !strcmp(buf, "DONE"))
+		t[0] = 0;
+	    else if (!strncmp(buf, "ABORT: ", 7)) { /* Strip "ABORT: "! */
+		t += 7;
+		abort = 1;
+	    }
+	}
+        s = sn;
+        if (abort) {
+            strcpy(s, "ABORT: ");
+            s += 7;
+        }
+        if (!*pre && !t[0]) {
+            /* If we don't have any sort of a message, make one! */
+            if (prec->val == 10 || (&prec->req0)[prec->val].type == CONSTANT)
+                strcpy(buf, "DONE");
+            else if (prec->dlying)
+                strcpy(buf, "Delaying!");
+	    else
+                sprintf(buf, "Step %d", prec->val);
+        }
+        if (*pre) {
+            strcpy(s, pre);
+            s += strlen(pre);
+            if (buf[0]) {
+                strcpy(s, ": ");
+                s += 2;
+            }
+            if ((u = index(t, ':'))) /* We've added a prefix, chop what follows! */
+                *u = 0;
+        }
+        if (t[0]) {
+            strcpy(s, t);
+            s += strlen(t);
+        }
+	DPRINTF(("%s: new stepname is %s\n", prec->name, sn));
+        if (strncmp(prec->stepname, sn, sizeof(prec->stepname))) {
+            strncpy(prec->stepname, sn, sizeof(prec->stepname));
+            return STEPNAME_MASK;
+        }
+    } else {
+        if (strcmp(prec->stepname, "DONE")) {
+            strcpy(prec->stepname, "DONE");
+            return STEPNAME_MASK;
+        }
+    }
+    return 0;
+}
+
 static long process(struct stepSequenceRecord *prec)
 {
     unsigned short mask;
-    int monitor_mask = 0, curstate = 0, status, finish = 0, st;
-    char sn[128], *s;
+    int monitor_mask = 0, curstate = 0, status, finish = 0;
 
     DPRINTF(("%s process.\n", prec->name));
-    if (prec->dlying)
+    if (prec->dlying) {
+	DPRINTF(("%s delaying, return.\n", prec->name));
+	if (set_statename(prec)) {
+	    mask = recGblResetAlarms(prec) | DBE_VALUE | DBE_LOG;
+	    db_post_events(prec, &prec->stepname, mask);
+	}
         return 0;
+    }
     prec->pact = TRUE;
     /* Note, if no CLR link, status is 0, so we need to initialize curstate above! */
     status = dbGetLink(&prec->clr, DBR_LONG, &curstate, 0, 0);
@@ -211,68 +289,7 @@ static long process(struct stepSequenceRecord *prec)
     }
 
     /* Now, set the step name! */
-    if (prec->state != selSSRstate_Done) {
-        /*
-         * OK, this is now more complicated than originally thought.
-         * We really want this to be "PREn: STEPn".  But if someone is
-         * aborted, we want to prepend "ABORT:"  But then "STEPn" might
-         * already reflect this!
-         */
-        int abort = (prec->state == selSSRstate_Aborted);
-        char *pre = (&prec->pre0)[prec->val];
-        char buf[128], *t = buf, *u;
-        if (prec->dlying)
-            strcpy(buf, "Next step");
-        else {
-            if ((&prec->stepname0)[prec->val].type == CONSTANT)
-                buf[0] = 0;
-            else {
-                st = dbGetLink((&prec->stepname0) + (prec->val), 
-                               DBR_STRING, t, 0, 0);
-                if (st || !strcmp(buf, "DONE"))
-                    t[0] = 0;
-                else if (!strncmp(buf, "ABORT: ", 7)) { /* Strip "ABORT: "! */
-                    t += 7;
-                    abort = 1;
-                }
-            }
-        }
-        s = sn;
-        if (abort) {
-            strcpy(s, "ABORT: ");
-            s += 7;
-        }
-        if (!*pre && !t[0]) {
-            /* If we don't have any sort of a message, make one! */
-            if (prec->val == 10 || (&prec->req0)[prec->val].type == CONSTANT)
-                strcpy(buf, "DONE");
-            else
-                sprintf(buf, "Step %d", prec->val);
-        }
-        if (*pre) {
-            strcpy(s, pre);
-            s += strlen(pre);
-            if (buf[0]) {
-                strcpy(s, ": ");
-                s += 2;
-            }
-            if ((u = index(t, ':'))) /* We've added a prefix, chop what follows! */
-                *u = 0;
-        }
-        if (t[0]) {
-            strcpy(s, t);
-            s += strlen(t);
-        }
-        if (strncmp(prec->stepname, sn, sizeof(prec->stepname))) {
-            strncpy(prec->stepname, sn, sizeof(prec->stepname));
-            monitor_mask |= STEPNAME_MASK;
-        }
-    } else {
-        if (strcmp(prec->stepname, "DONE")) {
-            strcpy(prec->stepname, "DONE");
-            monitor_mask |= STEPNAME_MASK;
-        }
-    }
+    monitor_mask |= set_statename(prec);
 
     prec->udf = FALSE;
     recGblGetTimeStamp(prec);

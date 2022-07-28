@@ -1,0 +1,41 @@
+Sigh.  Some PV names were getting long, so at the risk of making
+things incomprehensible, let's make the names shorter.  The only
+duplicate is "_N", but _SETNAME and _SETNAMENAME were doing the
+same thing in different contexts.
+
+For future debugging, here is the edit.
+
+_ABRT         --> AB
+_ACTIVE       --> _A
+_ARGS         --> AG
+_AUTO         --> AU
+_CALC         --> CA
+_CALCC        --> CC
+_CALCS        --> CS
+_COUNT        --> CT
+_DELAY        --> _D
+ELSE          --> _E
+_FIN          --> _F
+_FIN_SEQ      --> FS
+_MONNAME      --> MN
+_MONELSENAME  --> EN
+_MONST        --> MS
+_MONELSEST    --> ES
+_PIDMON       --> PM
+_PID          --> PD
+_PIPE         --> PP
+_PROC         --> _P
+_PROG         --> PG
+_SEQ          --> SQ
+_SELECT       --> SL
+_SETNAME      --> _N
+_SNAMENAME    --> _N
+_SNAME        --> SN
+_START        --> ST
+_STARTWAIT    --> SW
+_STATE        --> _S
+_STEP         --> SP
+_TEST         --> _T
+_TIMEOUT      --> TM
+_VAL          --> _V
+_WAIT         --> WT
