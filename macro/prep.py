@@ -194,7 +194,7 @@ def generate_seq(name, seq, fp):
             i = i + 1
             continue
         if l[1] == 'SUBSEQ':
-            if d is not None and d.strip()[-1] == ':':
+            if d is not None and d != "" and d.strip()[-1] == ':':
                 out.append('    field(STEPNAME%d,  "%s.STEPNAME CPP")\n' % (i % 9, r))
             out.append('    field(REQ%d,       "%s.REQ PP")\n' % (i % 9, r))
             out.append('    field(ABRT%d,      "%s.ABRT PP")\n' % (i % 9, r))
