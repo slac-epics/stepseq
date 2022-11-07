@@ -618,20 +618,91 @@ def generate_seq(name, seq, fp):
     for l in out:
         fp.write(l)
 
+format_map = {'d' : 'LONG', 'u': 'ULONG', 's': 'STRING'}
+
+# Utility function for read/write_record.
+def process_rw_record(lines, start, fp, func):
+    snam = "do%sRecord" % func.capitalize()
+    l = lines[0][len(func)+7:]
+    cnt = 1
+    while '{' not in l:
+        l += lines[cnt]
+        cnt += 1
+    h = [x.strip() for x in l.split(',')]
+    if h[0][0] != '(':
+        raise IOError("Line %d: Can't find '('?!?" % start)
+    h[0] = h[0][1:].strip()
+    if h[-1][-1] != '{':
+        raise IOError("Line %d: Can't find '{'?!?" % start)
+    h[-1] = h[-1][:-1].strip()
+    if h[-1][-1] != ')':
+        raise IOError("Line %d: Can't find ')'?!?" % start)
+    h[-1] = h[-1][:-1].strip()
+    h = [x[1:-1] if x[0] == '"' else x for x in h]  # Dequote it!
+    name = h[0]
+    fmt = h[1]
+    val  = h[-1]
+    typ  = h[-2]
+    args = h[2:-2]
+    if typ not in ['LONG', 'ULONG', 'DOUBLE', 'STRING']:
+        raise IOError("Line %d: invalid type '%s'" % (start, typ))
+    fp.write('record(stringout, %s_F)\n{\n' % name)
+    fp.write('    field(PINI, "YES")\n')
+    fp.write('    field(VAL, "%s")\n' % fmt)
+    fp.write('}\n\n')
+    fp.write('record(aSub, %s)\n{\n' % name)
+    fp.write('    field(INAM, "rwRecordInit")\n')
+    fp.write('    field(SNAM, "%s")\n' % snam)
+    fp.write('    field(EFLG,  "ON CHANGE")\n\n')
+    fp.write('    field(FTA,  "STRING")\n')
+    fp.write('    field(NOA,  "1")\n')
+    fp.write('    field(INPA, "%s_F NMS NPP")\n\n' % name)
+    argc = 0
+    for i in range(len(fmt)):
+        if fmt[i] == '%':
+            if fmt[i+1] not in "dus":
+                raise IOError("Line %d: invalid format '%%%s'" % (start, fmt[i+1]))
+            c = chr(ord('B') + argc)
+            fp.write('    field(FT%c,  "%s")\n' % (c, format_map[fmt[i+1]]))
+            fp.write('    field(NO%c,  "1")\n' % c)
+            fp.write('    field(INP%c, "%s")\n\n' % (c, args[argc]))
+            argc = argc + 1
+    if argc != len(args):
+        raise IOError("Line %d: wrong number of arguments in format!" % start)
+    fp.write('    field(FTU,  "%s")\n' % typ)
+    fp.write('    field(NOU,  "1")\n')
+    if func == 'read':
+        fp.write('\n')
+        fp.write('    field(FTVA,  "%s")\n' % typ)
+        fp.write('    field(NOVA,  "1")\n')
+        fp.write('    field(OUTA,  "%s NMS PP")\n\n' % val)
+        fp.write('    field(FTVB,  "STRING")\n')
+        fp.write('    field(NOVB,  "1")\n\n')
+    else: # write
+        fp.write('    field(INPU,  "%s")\n\n' % val)
+    for l in lines[cnt:]: # This should include the final '}'!
+        fp.write(l)
+
 def expand(lines, fp):
     i = 0;
     while i < len(lines):
-        if lines[i][:9] != "sequence(":
+        if (lines[i][:9] != "sequence(" and
+            lines[i][:12] != "read_record(" and
+            lines[i][:13] != "write_record("):
             fp.write(lines[i])
             i = i + 1
             continue
         start = i
         while lines[i][0] != '}':
             i = i + 1
-        #print "\nSequence from line %d to line %d" % (start, i)
-        d = process(lines[start:i+1], start)
-        generate_seq(d[0][2][0], d[0][3], fp)
         i = i + 1
+        if lines[start][:9] == "sequence(":
+            d = process(lines[start:i], start)
+            generate_seq(d[0][2][0], d[0][3], fp)
+        if lines[start][:12] == "read_record(":
+            process_rw_record(lines[start:i], start, fp, "read")
+        if lines[start][:13] == "write_record(":
+            process_rw_record(lines[start:i], start, fp, "write")
 
 if __name__ == '__main__':
     try:

@@ -23,12 +23,13 @@ LIBRARY_IOC_Linux = stepseq
 DBD += stepseq.dbd
 
 stepseq_DBD += seq_funcs.dbd
+stepseq_DBD += rwrec_funcs.dbd
 stepseq_DBD += stepSequenceRecord.dbd
 
 DBDINC += stepSequenceRecord
 INC += seq_funcs.h
 
-LIBSRCS += stepSequenceRecord.c seq_funcs.cpp
+LIBSRCS += stepSequenceRecord.c seq_funcs.cpp rwrec_funcs.cpp
 
 include $(TOP)/configure/RULES
 #----------------------------------------
