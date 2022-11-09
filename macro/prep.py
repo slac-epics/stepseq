@@ -679,7 +679,7 @@ def process_rw_record(lines, start, fp, func):
         fp.write('    field(FTVB,  "STRING")\n')
         fp.write('    field(NOVB,  "1")\n\n')
     else: # write
-        fp.write('    field(INPU,  "%s")\n\n' % val)
+        fp.write('    field(INPU,  "%s")\n\n' % val)  # No NMS NPP, because this might be a constant!
     for l in lines[cnt:]: # This should include the final '}'!
         fp.write(l)
 
