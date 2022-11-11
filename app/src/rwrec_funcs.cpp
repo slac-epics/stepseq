@@ -153,8 +153,8 @@ long doReadRecord(struct aSubRecord *psub)
 	    /* Finally, put the subscription link into inpu! */
 	    strcat(buf, " CPP NMS");
 	    sprintf(b2, "%s.INPU", psub->name);
-	    dbNameToAddr(b2, &addr);
-	    dbPutField(&addr, DBR_STRING, buf, 1);
+	    if (!dbNameToAddr(b2, &addr))
+		dbPutField(&addr, DBR_STRING, buf, 1);
 	}
     } else {
 	/* The PV name didn't change.  So just copy U to the output! */

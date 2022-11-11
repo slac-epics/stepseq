@@ -21,6 +21,8 @@ def process(lines, start):
         except: 
             ob = None
         c = []
+        if l == "":
+            continue
         if l[0] == '#':
             o.append([start+i, "COMMENT", l])
             continue
