@@ -31,7 +31,7 @@ DBDINC += stepSequenceRecord
 DBDINC += arbiterRecord
 INC += seq_funcs.h
 
-LIBSRCS += stepSequenceRecord.c seq_funcs.cpp rwrec_funcs.cpp
+LIBSRCS += stepSequenceRecord.c arbiterRecord.c seq_funcs.cpp rwrec_funcs.cpp
 
 include $(TOP)/configure/RULES
 #----------------------------------------
