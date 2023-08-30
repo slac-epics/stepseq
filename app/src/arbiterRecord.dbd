@@ -1,0 +1,296 @@
+recordtype(arbiter) {
+	include "dbCommon.dbd"
+	field(VAL,DBF_LONG) {
+		prompt("Grant")
+		special(SPC_NOMOD)
+		initial(-1)
+		interest(1)
+        }
+	field(STATE,DBF_ULONG) {
+		prompt("Fair pointer")
+		special(SPC_NOMOD)
+		initial(0)
+		interest(1)
+        }
+	field(OWNER,DBF_STRING) {
+		prompt("Current Owner")
+		special(SPC_NOMOD)
+		interest(1)
+		size(40)
+        }
+	field(CLEAR,DBF_ULONG) {
+		prompt("Master Clear")
+		pp(TRUE)
+		interest(1)
+        }
+	field(REQ0,DBF_ULONG) {
+		prompt("Request 0")
+		pp(TRUE)
+		interest(1)
+        }
+	field(REQ1,DBF_ULONG) {
+		prompt("Request 1")
+		pp(TRUE)
+		interest(1)
+        }
+	field(REQ2,DBF_ULONG) {
+		prompt("Request 2")
+		pp(TRUE)
+		interest(1)
+        }
+	field(REQ3,DBF_ULONG) {
+		prompt("Request 3")
+		pp(TRUE)
+		interest(1)
+        }
+	field(REQ4,DBF_ULONG) {
+		prompt("Request 4")
+		pp(TRUE)
+		interest(1)
+        }
+	field(REQ5,DBF_ULONG) {
+		prompt("Request 5")
+		pp(TRUE)
+		interest(1)
+        }
+	field(REQ6,DBF_ULONG) {
+		prompt("Request 6")
+		pp(TRUE)
+		interest(1)
+        }
+	field(REQ7,DBF_ULONG) {
+		prompt("Request 7")
+		pp(TRUE)
+		interest(1)
+        }
+	field(REQ8,DBF_ULONG) {
+		prompt("Request 8")
+		pp(TRUE)
+		interest(1)
+        }
+	field(REQ9,DBF_ULONG) {
+		prompt("Request 9")
+		pp(TRUE)
+		interest(1)
+        }
+	field(REQ10,DBF_ULONG) {
+		prompt("Request 10")
+		pp(TRUE)
+		interest(1)
+        }
+	field(REQ11,DBF_ULONG) {
+		prompt("Request 11")
+		pp(TRUE)
+		interest(1)
+        }
+	field(REQ12,DBF_ULONG) {
+		prompt("Request 12")
+		pp(TRUE)
+		interest(1)
+        }
+	field(REQ13,DBF_ULONG) {
+		prompt("Request 13")
+		pp(TRUE)
+		interest(1)
+        }
+	field(REQ14,DBF_ULONG) {
+		prompt("Request 14")
+		pp(TRUE)
+		interest(1)
+        }
+	field(REQ15,DBF_ULONG) {
+		prompt("Request 15")
+		pp(TRUE)
+		interest(1)
+        }
+	field(REQ16,DBF_ULONG) {
+		prompt("Request 16")
+		pp(TRUE)
+		interest(1)
+        }
+	field(REQ17,DBF_ULONG) {
+		prompt("Request 17")
+		pp(TRUE)
+		interest(1)
+        }
+	field(REQ18,DBF_ULONG) {
+		prompt("Request 18")
+		pp(TRUE)
+		interest(1)
+        }
+	field(REQ19,DBF_ULONG) {
+		prompt("Request 19")
+		pp(TRUE)
+		interest(1)
+        }
+	field(REQ20,DBF_ULONG) {
+		prompt("Request 20")
+		pp(TRUE)
+		interest(1)
+        }
+	field(REQ21,DBF_ULONG) {
+		prompt("Request 21")
+		pp(TRUE)
+		interest(1)
+        }
+	field(REQ22,DBF_ULONG) {
+		prompt("Request 22")
+		pp(TRUE)
+		interest(1)
+        }
+	field(REQ23,DBF_ULONG) {
+		prompt("Request 23")
+		pp(TRUE)
+		interest(1)
+        }
+	field(REQ24,DBF_ULONG) {
+		prompt("Request 24")
+		pp(TRUE)
+		interest(1)
+        }
+	field(REQ25,DBF_ULONG) {
+		prompt("Request 25")
+		pp(TRUE)
+		interest(1)
+        }
+	field(REQ26,DBF_ULONG) {
+		prompt("Request 26")
+		pp(TRUE)
+		interest(1)
+        }
+	field(REQ27,DBF_ULONG) {
+		prompt("Request 27")
+		pp(TRUE)
+		interest(1)
+        }
+	field(REQ28,DBF_ULONG) {
+		prompt("Request 28")
+		pp(TRUE)
+		interest(1)
+        }
+	field(REQ29,DBF_ULONG) {
+		prompt("Request 29")
+		pp(TRUE)
+		interest(1)
+        }
+	field(OWN0,DBF_INLINK) {
+		prompt("Owner name 0")
+		interest(1)
+        }
+	field(OWN1,DBF_INLINK) {
+		prompt("Owner name 1")
+		interest(1)
+        }
+	field(OWN2,DBF_INLINK) {
+		prompt("Owner name 2")
+		interest(1)
+        }
+	field(OWN3,DBF_INLINK) {
+		prompt("Owner name 3")
+		interest(1)
+        }
+	field(OWN4,DBF_INLINK) {
+		prompt("Owner name 4")
+		interest(1)
+        }
+	field(OWN5,DBF_INLINK) {
+		prompt("Owner name 5")
+		interest(1)
+        }
+	field(OWN6,DBF_INLINK) {
+		prompt("Owner name 6")
+		interest(1)
+        }
+	field(OWN7,DBF_INLINK) {
+		prompt("Owner name 7")
+		interest(1)
+        }
+	field(OWN8,DBF_INLINK) {
+		prompt("Owner name 8")
+		interest(1)
+        }
+	field(OWN9,DBF_INLINK) {
+		prompt("Owner name 9")
+		interest(1)
+        }
+	field(OWN10,DBF_INLINK) {
+		prompt("Owner name 10")
+		interest(1)
+        }
+	field(OWN11,DBF_INLINK) {
+		prompt("Owner name 11")
+		interest(1)
+        }
+	field(OWN12,DBF_INLINK) {
+		prompt("Owner name 12")
+		interest(1)
+        }
+	field(OWN13,DBF_INLINK) {
+		prompt("Owner name 13")
+		interest(1)
+        }
+	field(OWN14,DBF_INLINK) {
+		prompt("Owner name 14")
+		interest(1)
+        }
+	field(OWN15,DBF_INLINK) {
+		prompt("Owner name 15")
+		interest(1)
+        }
+	field(OWN16,DBF_INLINK) {
+		prompt("Owner name 16")
+		interest(1)
+        }
+	field(OWN17,DBF_INLINK) {
+		prompt("Owner name 17")
+		interest(1)
+        }
+	field(OWN18,DBF_INLINK) {
+		prompt("Owner name 18")
+		interest(1)
+        }
+	field(OWN19,DBF_INLINK) {
+		prompt("Owner name 19")
+		interest(1)
+        }
+	field(OWN20,DBF_INLINK) {
+		prompt("Owner name 20")
+		interest(1)
+        }
+	field(OWN21,DBF_INLINK) {
+		prompt("Owner name 21")
+		interest(1)
+        }
+	field(OWN22,DBF_INLINK) {
+		prompt("Owner name 22")
+		interest(1)
+        }
+	field(OWN23,DBF_INLINK) {
+		prompt("Owner name 23")
+		interest(1)
+        }
+	field(OWN24,DBF_INLINK) {
+		prompt("Owner name 24")
+		interest(1)
+        }
+	field(OWN25,DBF_INLINK) {
+		prompt("Owner name 25")
+		interest(1)
+        }
+	field(OWN26,DBF_INLINK) {
+		prompt("Owner name 26")
+		interest(1)
+        }
+	field(OWN27,DBF_INLINK) {
+		prompt("Owner name 27")
+		interest(1)
+        }
+	field(OWN28,DBF_INLINK) {
+		prompt("Owner name 28")
+		interest(1)
+        }
+	field(OWN29,DBF_INLINK) {
+		prompt("Owner name 29")
+		interest(1)
+        }
+}

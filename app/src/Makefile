@@ -25,8 +25,10 @@ DBD += stepseq.dbd
 stepseq_DBD += seq_funcs.dbd
 stepseq_DBD += rwrec_funcs.dbd
 stepseq_DBD += stepSequenceRecord.dbd
+stepseq_DBD += arbiterRecord.dbd
 
 DBDINC += stepSequenceRecord
+DBDINC += arbiterRecord
 INC += seq_funcs.h
 
 LIBSRCS += stepSequenceRecord.c seq_funcs.cpp rwrec_funcs.cpp
